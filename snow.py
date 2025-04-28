@@ -22,15 +22,15 @@ def snow_routine(precipitation, temperature, snowpack, liquid_water, params):
         runoff (float): Released meltwater to soil (mm).
     """
     # Extract parameters
-    TT = params['TT']
-    CFMAX = params['CFMAX']
-    CFR = params['CFR']
-    CWH = params['CWH']
-    SFCF = params['SFCF']
-    PCF = params['PCF']
+    TT = params['TT']['default']
+    CFMAX = params['CFMAX']['default']
+    CFR = params['CFR']['default']
+    CWH = params['CWH']['default']
+    SFCF = params['SFCF']['default']
+    PCF = params['PCF']['default']
     
     # Give the model a room to account for any biases in the estimation of precipitation
-    
+
     precipitation= precipitation * PCF
 
     # Initialize snowfall and rainfall

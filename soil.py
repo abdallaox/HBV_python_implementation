@@ -35,9 +35,9 @@ def soil_routine(runoff_from_snow, temperature, potential_et, soil_moisture, par
         Surface runoff due to soil overflow (mm/day).
     """
 
-    FC = params['FC']      # Maximum soil moisture capacity
-    BETA = params['BETA']  # Recharge curve parameter
-    LP = params['LP']      # Limit for potential ET to be fully achieved
+    FC = params['FC']     ['default']   # Maximum soil moisture capacity
+    BETA = params['BETA'] ['default'] # Recharge curve parameter
+    LP = params['LP']     ['default'] # Limit for potential ET to be fully achieved
 
     # --- Step 1: Calculate actual evapotranspiration ---
     if soil_moisture > LP * FC:

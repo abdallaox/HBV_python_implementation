@@ -37,11 +37,11 @@ def response_routine_two_tanks(out_to_response, upper_storage, lower_storage, pa
     """
     
     # Extract parameters
-    K0 = params['K0']      # Quick flow coefficient (above threshold)
-    K1 = params['K1']      # Intermediate flow coefficient
-    K2 = params['K2']      # Baseflow coefficient
-    UZL = params['UZL']    # Upper zone threshold
-    PERC = params['PERC']  # Percolation from upper to lower zone
+    K0 = params['K0'] ['default']      # Quick flow coefficient (above threshold)
+    K1 = params['K1'] ['default']     # Intermediate flow coefficient
+    K2 = params['K2'] ['default']     # Baseflow coefficient
+    UZL = params['UZL'] ['default']   # Upper zone threshold
+    PERC = params['PERC'] ['default'] # Percolation from upper to lower zone
     
     # --- Step 1: Add incoming water to upper zone reservoir ---
     upper_storage += out_to_response

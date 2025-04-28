@@ -32,26 +32,26 @@ class HBVModel:
         """Initialize the HBV model with default values."""
         self.data = None
         self.results = None
-        self.params = {
+        self.params= {
             'snow': {
-                'TT': 0.0,      # Temperature threshold for snow/rain (°C)
-                'CFMAX': 3.5,   # Degree-day factor (mm/°C/day)
-                'PCF': 1.0,     # Precipitation  correction factor (-)
-                'SFCF': 1.0,    # Snowfall correction factor (-)
-                'CFR': 0.05,    # Refreezing coefficient (-)
-                'CWH': 0.1      # Water holding capacity of snow (-)
+                'TT': {'min': -2.0, 'max': 2.0, 'default': 0.0},
+                'CFMAX': {'min': 1.0, 'max': 6.0, 'default': 3.5},
+                'PCF': {'min': 0.5, 'max': 1.5, 'default': 1.0},
+                'SFCF': {'min': 0.5, 'max': 1.5, 'default': 1.0},
+                'CFR': {'min': 0.0, 'max': 0.2, 'default': 0.05},
+                'CWH': {'min': 0.0, 'max': 0.2, 'default': 0.1}
             },
             'soil': {
-                'FC': 150.0,    # Field capacity (mm)
-                'LP': 0.7,      # Limit for potential evaporation (-)
-                'BETA': 2.0     # Shape coefficient (-)
+                'FC': {'min': 50.0, 'max': 300.0, 'default': 150.0},
+                'LP': {'min': 0.3, 'max': 1.0, 'default': 0.7},
+                'BETA': {'min': 1.0, 'max': 5.0, 'default': 2.0}
             },
             'response': {
-                'K0': 0.5,      # Quick flow recession coefficient (1/day)
-                'K1': 0.2,      # Intermediate flow recession coefficient (1/day)
-                'K2': 0.05,     # Baseflow recession coefficient (1/day)
-                'UZL': 20.0,    # Upper zone threshold (mm)
-                'PERC': 1.5     # Percolation rate (mm/day)
+                'K0': {'min': 0.1, 'max': 0.9, 'default': 0.5},
+                'K1': {'min': 0.05, 'max': 0.5, 'default': 0.2},
+                'K2': {'min': 0.01, 'max': 0.1, 'default': 0.05},
+                'UZL': {'min': 5.0, 'max': 50.0, 'default': 20.0},
+                'PERC': {'min': 0.5, 'max': 3.0, 'default': 1.5}
             }
         }
         
@@ -150,28 +150,28 @@ class HBVModel:
 
         print(f"Loaded data with {len(self.data)} time steps, from {self.start_date} to {self.end_date}")
     
-    def set_parameters(self, snow_params=None, soil_params=None, response_params=None):
-        """
-        Set model parameters.
+    def set_parameters(self, custom_ranges=None):
+        """Set parameters and thier ranges to overwrite the default.
         
-        Parameters:
-        -----------
-        snow_params : dict, optional
-            Parameters for snow routine
-        soil_params : dict, optional
-            Parameters for soil routine
-        response_params : dict, optional
-            Parameters for response routine
+        Args:
+            custom_ranges (dict, optional): A dictionary with the same structure as `self.params`, 
+                                containing custom min/max/default values.
         """
-        if snow_params:
-            self.params['snow'].update(snow_params)
-        if soil_params:
-            self.params['soil'].update(soil_params)
-        if response_params:
-            self.params['response'].update(response_params)
-            
-        print("Parameters updated.")
-    
+        
+        # If custom ranges are provided, update the defaults
+        if custom_ranges is not None:
+            for group in custom_ranges:
+                if group in self.params:
+                    for param in custom_ranges[group]:
+                        if param in self.params[group]:
+                            self.params[group][param].update(custom_ranges[group][param])
+                        else:
+                            raise ValueError(f"Unknown parameter '{param}' in group '{group}'")
+                else:
+                    raise ValueError(f"Unknown group '{group}'")
+        else: raise ValueError(f"No parameters provided—–make sure to provide the input in the correct format")
+  
+
     def set_initial_conditions(self, snowpack=None, liquid_water=None, 
                               soil_moisture=None, upper_storage=None, 
                               lower_storage=None):
@@ -431,8 +431,8 @@ class HBVModel:
         # 2. Temperature with TT threshold
         ax2 = axs[1]
         ax2.plot(dates, self.results['temperature'], color='red', label='Temperature')
-        ax2.axhline(y=self.params['snow']['TT'], color='gray', linestyle='--', 
-                label=f"TT Threshold ({self.params['snow']['TT']}°C)")
+        ax2.axhline(y=self.params['snow']['TT']['default'], color='gray', linestyle='--', 
+                label=f"TT Threshold ({self.params['snow']['TT']['default']}°C)")
         ax2.set_ylabel('Temperature (°C)')
         ax2.set_title('Temperature with Snow Threshold')
         ax2.legend(loc='upper right')
@@ -463,8 +463,8 @@ class HBVModel:
         # 6. Soil moisture
         ax6 = axs[5]
         ax6.plot(dates, self.results['soil_moisture'], color='brown', label='Soil Moisture')
-        ax6.axhline(y=self.params['soil']['FC'], color='gray', linestyle='--', 
-                label=f"Field Capacity ({self.params['soil']['FC']} mm)")
+        ax6.axhline(y=self.params['soil']['FC']['default'], color='gray', linestyle='--', 
+                label=f"Field Capacity ({self.params['soil']['FC']['default']} mm)")
         ax6.set_ylabel('Soil Moisture (mm)')
         ax6.set_title('Soil Moisture')
         ax6.legend(loc='upper right')
@@ -483,7 +483,7 @@ class HBVModel:
         ax8 = axs[7]
         ax8.plot(dates, self.results['upper_storage'], color='lightcoral', label='Upper Storage')
         ax8.plot(dates, self.results['lower_storage'], color='darkblue', label='Lower Storage')
-        ax8.axhline(y=self.params['response']['UZL'], color='gray', linestyle='--', label='Upper Zone Threshold')
+        ax8.axhline(y=self.params['response']['UZL']['default'], color='gray', linestyle='--', label='Upper Zone Threshold')
         ax8.set_ylabel('Storage (mm)')
         ax8.set_title('Groundwater Storages')
         ax8.legend(loc='upper right')
