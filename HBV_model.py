@@ -36,6 +36,7 @@ class HBVModel:
             'snow': {
                 'TT': 0.0,      # Temperature threshold for snow/rain (°C)
                 'CFMAX': 3.5,   # Degree-day factor (mm/°C/day)
+                'PCF': 1.0,     # Precipitation  correction factor (-)
                 'SFCF': 1.0,    # Snowfall correction factor (-)
                 'CFR': 0.05,    # Refreezing coefficient (-)
                 'CWH': 0.1      # Water holding capacity of snow (-)
@@ -69,40 +70,54 @@ class HBVModel:
         self.time_step = 'D'  # Default: daily
     
     def load_data(self, file_path=None, data=None, date_column='Date', 
-                  precip_column='Precipitation', temp_column='Temperature', 
-                  pet_column='PotentialET', obs_q_column=None):
+                precip_column='Precipitation', temp_column='Temperature', 
+                pet_column='PotentialET', obs_q_column=None,
+                start_date=None, end_date=None):
         """
-        Load data from file or pandas DataFrame.
-        
+        Load data from file or pandas DataFrame, optionally between specified dates.
+
         Parameters:
         -----------
         file_path : str, optional
-            Path to data file (CSV format)
+            Path to data file (CSV format).
         data : pandas.DataFrame, optional
-            Data already in a DataFrame
+            Data already in a DataFrame.
         date_column : str, default 'Date'
-            Name of column containing dates
+            Name of column containing dates.
         precip_column : str, default 'Precipitation'
-            Name of column containing precipitation data
+            Name of column containing precipitation data.
         temp_column : str, default 'Temperature'
-            Name of column containing temperature data
+            Name of column containing temperature data.
         pet_column : str, default 'PotentialET'
-            Name of column containing potential evapotranspiration data
+            Name of column containing potential evapotranspiration data.
         obs_q_column : str, optional
-            Name of column containing observed discharge data
+            Name of column containing observed discharge data.
+        start_date : str or datetime, optional
+            Start date for filtering the data.
+        end_date : str or datetime, optional
+            End date for filtering the data.
         """
         if file_path is not None:
             data = pd.read_csv(file_path)
-            
-            # Try to convert the date column to datetime
-            try:
-                data[date_column] = pd.to_datetime(data[date_column])
-            except:
-                print(f"Warning: Couldn't convert {date_column} to datetime.")
-        
+
+        # Try to convert the date column to datetime
+        try:
+            data[date_column] = pd.to_datetime(data[date_column])
+        except Exception as e:
+            print(f"Warning: Couldn't convert {date_column} to datetime. {e}")
+
+        # --- Filter data if start_date or end_date provided ---
+        if start_date is not None:
+            start_date = pd.to_datetime(start_date)
+            data = data[data[date_column] >= start_date]
+
+        if end_date is not None:
+            end_date = pd.to_datetime(end_date)
+            data = data[data[date_column] <= end_date]
+
         # Store the data
-        self.data = data
-        
+        self.data = data.reset_index(drop=True)
+
         # Set column names
         self.column_names = {
             'date': date_column,
@@ -111,12 +126,12 @@ class HBVModel:
             'pet': pet_column,
             'obs_q': obs_q_column
         }
-        
-        # Set time information
-        if date_column in data.columns:
+
+        # Save the start and end dates (IMPORTANT: based on actual data loaded)
+        if date_column in data.columns and len(data) > 0:
             self.start_date = data[date_column].min()
             self.end_date = data[date_column].max()
-            
+
             # Try to determine time step
             if len(data) > 1:
                 diff = data[date_column].diff().dropna()
@@ -125,9 +140,15 @@ class HBVModel:
                     self.time_step = 'D'
                 elif modal_diff == pd.Timedelta(hours=1):
                     self.time_step = 'H'
+                else:
+                    self.time_step = str(modal_diff)
                 print(f"Time step detected: {self.time_step}")
-        
-        print(f"Loaded data with {len(data)} time steps, from {self.start_date} to {self.end_date}")
+        else:
+            self.start_date = None
+            self.end_date = None
+            print("Warning: No dates found in data!")
+
+        print(f"Loaded data with {len(self.data)} time steps, from {self.start_date} to {self.end_date}")
     
     def set_parameters(self, snow_params=None, soil_params=None, response_params=None):
         """
@@ -450,8 +471,8 @@ class HBVModel:
         
         # 7. Recharge (output from soil to response routine)
         ax7 = axs[6]
-        ax7.plot(dates, self.results['recharge'], color='purple', label='Recharge')
-        ax7.plot(dates, self.results['runoff_soil'], color='pink', label='Runoff (overflow from soil))')
+        ax7.plot(dates, self.results['recharge'], color='purple',linewidth=0.5, label='Recharge')
+        ax7.plot(dates, self.results['runoff_soil'], color='red',linewidth=0.5, label='Runoff (overflow from soil))')
         # ax7.plot(dates, self.results['recharge'] + self.results['runoff_soil'], 
         #         color='darkviolet', linestyle='--', linewidth=1, label='Total to Response')
         ax7.set_ylabel('Water (mm/day)')
@@ -507,10 +528,11 @@ class HBVModel:
                 ax10.set_title(
                     f"Discharge Comparison (NSE: {metrics['NSE']:.2f}, KGE: {metrics['KGE']:.2f})"
                 )
+            else: ax10.set_title('Discharge Comparison')
         
         ax10.set_ylabel('Discharge (mm/day)')
         ax10.set_xlabel('Date')
-        ax10.set_title('Discharge Comparison')
+        
         ax10.legend(loc='upper right')
         
         # Format x-axis dates if available
