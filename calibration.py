@@ -111,41 +111,42 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
         # Get simulated discharge and valid observed discharge
         sim_q = model.results['discharge'][valid_idx]
         obs_q_valid = obs_q[valid_idx]
-        
+        model.calculate_performance_metrics
         # Calculate objective function value
         if objective == 'NSE':
             # Nash-Sutcliffe Efficiency (to be maximized)
-            mean_obs = np.mean(obs_q_valid)
-            nse_numerator = np.sum((obs_q_valid - sim_q) ** 2)
-            nse_denominator = np.sum((obs_q_valid - mean_obs) ** 2)
-            value = 1 - (nse_numerator / nse_denominator)
-            # For minimization, return negative NSE
-            return - value
+            # mean_obs = np.mean(obs_q_valid)
+            # nse_numerator = np.sum((obs_q_valid - sim_q) ** 2)
+            # nse_denominator = np.sum((obs_q_valid - mean_obs) ** 2)
+            # value = 1 - (nse_numerator / nse_denominator)
+            # # For minimization, return negative NSE
+            
+            return - model.performance_metrics['NSE']
             
         elif objective == 'KGE':
-            # Kling-Gupta Efficiency (to be maximized)
-            mean_sim = np.mean(sim_q)
-            mean_obs = np.mean(obs_q_valid)
-            std_sim = np.std(sim_q)
-            std_obs = np.std(obs_q_valid)
+            # # Kling-Gupta Efficiency (to be maximized)
+            # mean_sim = np.mean(sim_q)
+            # mean_obs = np.mean(obs_q_valid)
+            # std_sim = np.std(sim_q)
+            # std_obs = np.std(obs_q_valid)
             
-            r = np.corrcoef(obs_q_valid, sim_q)[0, 1]  # Correlation
-            alpha = std_sim / std_obs  # Relative variability
-            beta = mean_sim / mean_obs  # Bias
+            # r = np.corrcoef(obs_q_valid, sim_q)[0, 1]  # Correlation
+            # alpha = (std_sim/mean_sim) / (std_obs/mean_sim)  # Relative variability
+            # beta = mean_sim / mean_obs  # Bias
             
-            kge = 1 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2)
+            # kge = 1 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2)
             # For minimization, return negative KGE
-            return - kge
+            return - model.performance_metrics['KGE']
             
         elif objective == 'RMSE':
             # Root Mean Square Error (to be minimized)
-            rmse = np.sqrt(np.mean((obs_q_valid - sim_q) ** 2))
-            return rmse
+            # rmse = np.sqrt(np.mean((obs_q_valid - sim_q) ** 2))
+            return model.performance_metrics['RMSE']
             
         elif objective == 'MAE':
             # Mean Absolute Error (to be minimized)
-            mae = np.mean(np.abs(obs_q_valid - sim_q))
-            return mae
+            # mae = np.mean(np.abs(obs_q_valid - sim_q))
+            return model.performance_metrics['MAE']
         
         else:
             raise ValueError(f"Unknown objective function: {objective}")

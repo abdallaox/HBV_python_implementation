@@ -130,10 +130,11 @@ class HBVModel:
                     daily_df = pd.DataFrame({'index': data.index, 'month': ((data.index // 30) % 12 + 1)})
 
                 daily_df = daily_df.merge(monthly_pet, on='month', how='left')
+                daily_df['pet'] = daily_df['pet'].where(daily_df['pet'] != daily_df['pet'].shift(), np.nan)
                 daily_df['pet'] = daily_df['pet'].interpolate(method='linear')
 
-                smoothed_pet = pd.Series(monthly_pet['pet'].tolist() * 3).interpolate().iloc[12:24].values
-                daily_df['pet'] = daily_df['month'].map(lambda m: smoothed_pet[m - 1])
+                # smoothed_pet = pd.Series(monthly_pet['pet'].tolist() * 3).interpolate().iloc[12:24].values
+                # daily_df['pet'] = daily_df['month'].map(lambda m: smoothed_pet[m - 1])
 
                 data = data.drop(columns=[pet_column])
                 merge_col = date_column if has_date else 'index'
@@ -384,7 +385,7 @@ class HBVModel:
         std_sim = np.std(sim_q_valid)
         
         r = np.corrcoef(obs_q_valid, sim_q_valid)[0, 1]  # Correlation coefficient
-        alpha = std_sim / std_obs  # Relative variability
+        alpha = (std_sim/mean_sim) / (std_obs/mean_obs)  # Relative variability
         beta = mean_sim / mean_obs  # Bias
         
         kge = 1 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2)
@@ -392,13 +393,18 @@ class HBVModel:
         # Calculate percent bias
         pbias = 100 * (np.sum(sim_q_valid - obs_q_valid) / np.sum(obs_q_valid))
         
+        # Calculate RMSE and MAE
+        rmse = np.sqrt(np.mean((sim_q_valid - obs_q_valid) ** 2))
+        mae = np.mean(np.abs(sim_q_valid - obs_q_valid))
+        
         # Store metrics
         self.performance_metrics = {
             'NSE': nse,
             'KGE': kge,
             'PBIAS': pbias,
-            'r': r
-        }
+            'RMSE': rmse,
+            'MAE': mae,
+            'r': r         }
         
         print(f"Performance metrics calculated:")
         print(f"NSE: {nse:.3f}")
