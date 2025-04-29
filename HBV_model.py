@@ -436,16 +436,17 @@ class HBVModel:
         
         # Define subplots layout (now 9 subplots)
         axs = []
-        axs.append(fig.add_subplot(10, 1, 1))  # Precipitation
-        axs.append(fig.add_subplot(10, 1, 2))  # Temperature
-        axs.append(fig.add_subplot(10, 1, 3))  # Snow pack and liquid water
-        axs.append(fig.add_subplot(10, 1, 4))  # Runoff from snow
-        axs.append(fig.add_subplot(10, 1, 5))  # Potential and actual ET
-        axs.append(fig.add_subplot(10, 1, 6))  # Soil moisture
-        axs.append(fig.add_subplot(10, 1, 7))  # Recharge (output from soil to response)
-        axs.append(fig.add_subplot(10, 1, 8))  # Groundwater storages
-        axs.append(fig.add_subplot(10, 1, 9))  # Discharge components and total
-        axs.append(fig.add_subplot(10, 1, 10))  # Discharge components and total
+        axs.append(fig.add_subplot(11, 1, 1))   # Precipitation
+        axs.append(fig.add_subplot(11, 1, 2))   # Temperature
+        axs.append(fig.add_subplot(11, 1, 3))   # Snow pack and liquid water
+        axs.append(fig.add_subplot(11, 1, 4))   # Runoff from snow
+        axs.append(fig.add_subplot(11, 1, 5))   # Potential and actual ET
+        axs.append(fig.add_subplot(11, 1, 6))   # Soil moisture
+        axs.append(fig.add_subplot(11, 1, 7))   # Recharge (output from soil to response)
+        axs.append(fig.add_subplot(11, 1, 8))   # Groundwater storages
+        axs.append(fig.add_subplot(11, 1, 9))   # Discharge components and total
+        axs.append(fig.add_subplot(11, 1, 10))  # Discharge components and total
+        axs.append(fig.add_subplot(11, 1, 11))  # Discharge components and total
 
         # Get dates for x-axis
         dates = self.results['dates']
@@ -513,20 +514,25 @@ class HBVModel:
         ax7.set_title('Soil Output to the Response Routine')
         ax7.legend(loc='upper right')
         
-        # 8. Groundwater storages
+        # 8. upper storages
         ax8 = axs[7]
         ax8.plot(dates, self.results['upper_storage'], color='lightcoral', label='Upper Storage')
-        ax8.plot(dates, self.results['lower_storage'], color='darkblue', label='Lower Storage')
         ax8.axhline(y=self.params['response']['UZL']['default'], color='gray', linestyle='--', label='Fast Response Threshold (ULZ)')
-        ax8.set_ylabel('Storage (mm)')
-        ax8.set_title('Groundwater Storages')
+        ax8.set_ylabel('storage (mm)')
+        ax8.set_title('Upper tank Storages')
         ax8.legend(loc='upper right')
+        # 8. Groundwater storages
+        ax9 = axs[8]
+        ax9.plot(dates, self.results['lower_storage'], color='darkblue', label='Lower Storage')
+        ax9.set_ylabel('Storage (mm)')
+        ax9.set_title('Lower tank Storages')
+        ax9.legend(loc='upper right')
         
         # 9. Discharge Components (Stacked)
-        ax9 = axs[8]
+        ax10 = axs[9]
         
         # Stackplot with components only
-        ax9.stackplot(dates,
+        ax10.stackplot(dates,
                     self.results['baseflow'],
                     self.results['intermediate_flow'],
                     self.results['quick_flow'],
@@ -534,40 +540,40 @@ class HBVModel:
                     colors=['royalblue', 'darkorange', 'tomato'])
         
         # Add total discharge line
-        ax9.plot(dates, self.results['discharge'], 
+        ax10.plot(dates, self.results['discharge'], 
                 color='black', linestyle=':', linewidth=0.5,
                 label='Total Discharge (sum)')
         
-        ax9.set_ylabel('Flow (mm/day)')
-        ax9.set_title('Runoff Components (Stacked)')
-        ax9.legend(loc='upper right')
+        ax10.set_ylabel('Flow (mm/day)')
+        ax10.set_title('Runoff Components (Stacked)')
+        ax10.legend(loc='upper right')
         
         # 10. Discharge Comparison (Total vs Observed)
-        ax10 = axs[9]
+        ax11 = axs[10]
         
         # Plot simulated total
-        ax10.plot(dates, self.results['discharge'], 
+        ax11.plot(dates, self.results['discharge'], 
                 color='darkgreen', linewidth=2,
                 label='Simulated Discharge')
         
         # Plot observed if available
         if 'observed_q' in self.results:
-            ax10.plot(dates, self.results['observed_q'], 
+            ax11.plot(dates, self.results['observed_q'], 
                     color='black', linestyle='--', linewidth=1.5,
                     label='Observed Discharge')
             
             # Add performance metrics to title
             if hasattr(self, 'performance_metrics'):
                 metrics = self.performance_metrics
-                ax10.set_title(
-                    f"Discharge Comparison (NSE: {metrics['NSE']:.2f}, KGE: {metrics['KGE']:.2f})"
+                ax11.set_title(
+                    f"Discharge Comparison (NSE: {metrics['NSE']:.2f}, KGE: {metrics['KGE']:.2f}, PBIAS: {metrics['PBIAS']:.2f})"
                 )
-            else: ax10.set_title('Discharge Comparison')
+            else: ax11.set_title('Discharge Comparison')
         
-        ax10.set_ylabel('Discharge (mm/day)')
-        ax10.set_xlabel('Date')
+        ax11.set_ylabel('Discharge (mm/day)')
+        ax11.set_xlabel('Date')
         
-        ax10.legend(loc='upper right')
+        ax11.legend(loc='upper right')
         
         # Format x-axis dates if available
         if is_datetime:
