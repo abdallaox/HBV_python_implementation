@@ -2,16 +2,17 @@
 HBV Hydrological Model
 
 This module integrates the snow, soil, and response routines into a complete
-HBV hydrological model. It handles parameter management, data reading, model
+HBV-like hydrological model. It handles parameter management, data reading, model
 execution, and output visualization.
 
 Usage:
     from hbv_model import HBVModel
     model = HBVModel()
     model.load_data("path/to/data.csv")
-    model.set_parameters(snow_params, soil_params, response_params)
+    model.set_parameters(params)
     model.run()
     model.plot_results()
+    model.save_results()
 """
 
 import numpy as np
@@ -69,86 +70,108 @@ class HBVModel:
         self.end_date = None
         self.time_step = 'D'  # Default: daily
     
-    def load_data(self, file_path=None, data=None, date_column='Date', 
-                precip_column='Precipitation', temp_column='Temperature', 
-                pet_column='PotentialET', obs_q_column=None,
-                start_date=None, end_date=None):
+    def load_data(self, file_path=None, data=None, date_column='Date',
+              precip_column='Precipitation', temp_column='Temperature',
+              pet_column='PotentialET', obs_q_column=None,
+              start_date=None, end_date=None, date_format=None):
         """
-        Load data from file or pandas DataFrame, optionally between specified dates.
+        Load data from file or DataFrame, handling PET interpolation and flexible date parsing.
 
         Parameters:
         -----------
         file_path : str, optional
-            Path to data file (CSV format).
+            Path to CSV file.
         data : pandas.DataFrame, optional
-            Data already in a DataFrame.
+            Pre-loaded DataFrame.
         date_column : str, default 'Date'
-            Name of column containing dates.
-        precip_column : str, default 'Precipitation'
-            Name of column containing precipitation data.
-        temp_column : str, default 'Temperature'
-            Name of column containing temperature data.
-        pet_column : str, default 'PotentialET'
-            Name of column containing potential evapotranspiration data.
+            Name of column containing date.
+        precip_column : str
+        temp_column : str
+        pet_column : str
         obs_q_column : str, optional
-            Name of column containing observed discharge data.
         start_date : str or datetime, optional
-            Start date for filtering the data.
         end_date : str or datetime, optional
-            End date for filtering the data.
+        date_format : str, optional
+            Format string for parsing dates (e.g. '%Y%m%d' for '19510601').
         """
+        import pandas as pd
+
         if file_path is not None:
             data = pd.read_csv(file_path)
 
-        # Try to convert the date column to datetime
-        try:
-            data[date_column] = pd.to_datetime(data[date_column])
-        except Exception as e:
-            print(f"Warning: Couldn't convert {date_column} to datetime. {e}")
+        if data is None:
+            raise ValueError("Either file_path or data must be provided.")
 
-        # --- Filter data if start_date or end_date provided ---
-        if start_date is not None:
-            start_date = pd.to_datetime(start_date)
-            data = data[data[date_column] >= start_date]
+        has_date = date_column in data.columns and data[date_column].notna().all()
 
-        if end_date is not None:
-            end_date = pd.to_datetime(end_date)
-            data = data[data[date_column] <= end_date]
+        if has_date:
+            try:
+                if date_format:
+                    data[date_column] = pd.to_datetime(data[date_column], format=date_format)
+                else:
+                    data[date_column] = pd.to_datetime(data[date_column])
+            except Exception as e:
+                print(f"Warning: Failed to convert {date_column} to datetime. {e}")
+                has_date = False
 
-        # Store the data
+        # Expand PET if monthly means
+        if pet_column in data.columns:
+            pet_data = data[pet_column].dropna()
+            if len(pet_data) == 12:
+                print("Detected 12 PET values (monthly means), expanding to daily values...")
+                monthly_pet = pd.DataFrame({'month': range(1, 13), 'pet': pet_data.values})
+
+                if has_date:
+                    min_date = data[date_column].min()
+                    max_date = data[date_column].max()
+                    full_date_range = pd.date_range(start=min_date, end=max_date, freq='D')
+                    daily_df = pd.DataFrame({date_column: full_date_range, 'month': full_date_range.month})
+                else:
+                    daily_df = pd.DataFrame({'index': data.index, 'month': ((data.index // 30) % 12 + 1)})
+
+                daily_df = daily_df.merge(monthly_pet, on='month', how='left')
+                daily_df['pet'] = daily_df['pet'].interpolate(method='linear')
+
+                smoothed_pet = pd.Series(monthly_pet['pet'].tolist() * 3).interpolate().iloc[12:24].values
+                daily_df['pet'] = daily_df['month'].map(lambda m: smoothed_pet[m - 1])
+
+                data = data.drop(columns=[pet_column])
+                merge_col = date_column if has_date else 'index'
+                data = data.reset_index().merge(daily_df[[merge_col, 'pet']], on=merge_col, how='left').set_index('index')
+                data = data.rename(columns={'pet': pet_column})
+
+        if has_date:
+            if start_date is not None:
+                data = data[data[date_column] >= pd.to_datetime(start_date)]
+            if end_date is not None:
+                data = data[data[date_column] <= pd.to_datetime(end_date)]
+
         self.data = data.reset_index(drop=True)
-
-        # Set column names
         self.column_names = {
-            'date': date_column,
+            'date': date_column if has_date else None,
             'precip': precip_column,
             'temp': temp_column,
             'pet': pet_column,
             'obs_q': obs_q_column
         }
 
-        # Save the start and end dates (IMPORTANT: based on actual data loaded)
-        if date_column in data.columns and len(data) > 0:
+        if has_date and len(data) > 0:
             self.start_date = data[date_column].min()
             self.end_date = data[date_column].max()
-
-            # Try to determine time step
-            if len(data) > 1:
-                diff = data[date_column].diff().dropna()
+            diff = data[date_column].diff().dropna()
+            if not diff.empty:
                 modal_diff = diff.mode().iloc[0]
-                if modal_diff == pd.Timedelta(days=1):
-                    self.time_step = 'D'
-                elif modal_diff == pd.Timedelta(hours=1):
-                    self.time_step = 'H'
-                else:
-                    self.time_step = str(modal_diff)
+                self.time_step = 'D' if modal_diff == pd.Timedelta(days=1) else (
+                    'H' if modal_diff == pd.Timedelta(hours=1) else str(modal_diff))
                 print(f"Time step detected: {self.time_step}")
         else:
             self.start_date = None
             self.end_date = None
-            print("Warning: No dates found in data!")
+            self.time_step = 'Index-based'
+            print("No date column found; using index as time step.")
 
         print(f"Loaded data with {len(self.data)} time steps, from {self.start_date} to {self.end_date}")
+
     
     def set_parameters(self, custom_ranges=None):
         """Set parameters and thier ranges to overwrite the default.
@@ -394,6 +417,11 @@ class HBVModel:
         show_plots : bool, default True
             Whether to display the plots
         """
+        # --- Create directory if it doesn't exist ---
+        if output_file is not None:
+            output_dir = os.path.dirname(output_file)
+            if output_dir:  # only attempt if there's a directory part
+                os.makedirs(output_dir, exist_ok=True)
         if self.results is None:
             raise ValueError("No results to plot. Run the model first.")
             
@@ -434,7 +462,7 @@ class HBVModel:
         ax2.axhline(y=self.params['snow']['TT']['default'], color='gray', linestyle='--', 
                 label=f"TT Threshold ({self.params['snow']['TT']['default']}°C)")
         ax2.set_ylabel('Temperature (°C)')
-        ax2.set_title('Temperature with Snow Threshold')
+        ax2.set_title('Temperature')
         ax2.legend(loc='upper right')
         
         # 3. Snow pack and liquid water
@@ -449,7 +477,7 @@ class HBVModel:
         ax4 = axs[3]
         ax4.plot(dates, self.results['runoff_from_snow'], color='skyblue', label='Runoff from Snow')
         ax4.set_ylabel('Runoff (mm/day)')
-        ax4.set_title('Runoff from Snow')
+        ax4.set_title('Runoff from the Snow Routine')
         ax4.legend(loc='upper right')
         
         # 5. Potential and actual ET
@@ -464,7 +492,7 @@ class HBVModel:
         ax6 = axs[5]
         ax6.plot(dates, self.results['soil_moisture'], color='brown', label='Soil Moisture')
         ax6.axhline(y=self.params['soil']['FC']['default'], color='gray', linestyle='--', 
-                label=f"Field Capacity ({self.params['soil']['FC']['default']} mm)")
+                label=f"Field Capacity ({self.params['soil']['FC']['default']:.2f} mm)")
         ax6.set_ylabel('Soil Moisture (mm)')
         ax6.set_title('Soil Moisture')
         ax6.legend(loc='upper right')
@@ -476,14 +504,14 @@ class HBVModel:
         # ax7.plot(dates, self.results['recharge'] + self.results['runoff_soil'], 
         #         color='darkviolet', linestyle='--', linewidth=1, label='Total to Response')
         ax7.set_ylabel('Water (mm/day)')
-        ax7.set_title('Soil Output to Response Routine')
+        ax7.set_title('Soil Output to the Response Routine')
         ax7.legend(loc='upper right')
         
         # 8. Groundwater storages
         ax8 = axs[7]
         ax8.plot(dates, self.results['upper_storage'], color='lightcoral', label='Upper Storage')
         ax8.plot(dates, self.results['lower_storage'], color='darkblue', label='Lower Storage')
-        ax8.axhline(y=self.params['response']['UZL']['default'], color='gray', linestyle='--', label='Upper Zone Threshold')
+        ax8.axhline(y=self.params['response']['UZL']['default'], color='gray', linestyle='--', label='Fast Response Threshold (ULZ)')
         ax8.set_ylabel('Storage (mm)')
         ax8.set_title('Groundwater Storages')
         ax8.legend(loc='upper right')
@@ -560,8 +588,13 @@ class HBVModel:
         output_file : str
             Path to output file
         """
-        if self.results is None:
-            raise ValueError("No results to save. Run the model first.")
+        # --- Create directory if it doesn't exist ---
+        if output_file is not None:
+            output_dir = os.path.dirname(output_file)
+            if output_dir:  # only attempt if there's a directory part
+                os.makedirs(output_dir, exist_ok=True)
+            if self.results is None:
+                raise ValueError("No results to save. Run the model first.")
             
         # Create a DataFrame from results
         results_df = pd.DataFrame()

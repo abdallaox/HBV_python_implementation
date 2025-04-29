@@ -12,7 +12,7 @@ def hbv_step(precipitation, temperature, potential_et, params, initial_condition
         precipitation (float): Precipitation at the timestep (mm).
         temperature (float): Air temperature at the timestep (°C).
         potential_et (float): Potential evapotranspiration at the timestep (mm).
-        params (dict): Dictionary with parameters:
+        params (dict): Dictionary with parameters and their ranges:
             - 'snow': parameters for the snow routine
             - 'soil': parameters for the soil routine
             - 'response': parameters for the groundwater response routine
