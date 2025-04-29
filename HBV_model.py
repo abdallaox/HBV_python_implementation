@@ -21,7 +21,6 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import os
 import datetime
-
 from hbv_step import hbv_step
 
 class HBVModel:
@@ -280,43 +279,12 @@ class HBVModel:
         if obs_q is not None:
             results['observed_q'] = obs_q
         
-        # # Get initial storage values
-        # snowpack = self.states['snowpack']
-        # liquid_water = self.states['liquid_water']
-        # soil_moisture = self.states['soil_moisture']
-        # upper_storage = self.states['upper_storage']
-        # lower_storage = self.states['lower_storage']
         
         print(f"Starting model run for {n_steps} time steps...")
         
         # Main simulation loop
         for t in range(n_steps):
-            # # Snow routine
-            # snowpack, liquid_water, runoff_from_snow = self.snow_routine(
-            #     precip[t],
-            #     temp[t],
-            #     snowpack,
-            #     liquid_water,
-            #     self.params['snow']
-            # )
-            
-            # # Soil routine
-            # soil_moisture, out_to_response, recharge, runoff_soil, actual_et = self.soil_routine(
-            #     runoff_from_snow,
-            #     temp[t],
-            #     pet[t],
-            #     soil_moisture,
-            #     self.params['soil']
-            # )
-            
-            # # Response routine
-            # upper_storage, lower_storage, discharge, quick_flow, intermediate_flow, baseflow = self.response_routine_two_tanks(
-            #     out_to_response,
-            #     upper_storage,
-            #     lower_storage,
-            #     self.params['response']
-            # )
-
+          
             self.states, fluxes = hbv_step(precip[t],  temp[t], pet[t], self.params, self.states)
             
             # Store results
@@ -644,3 +612,59 @@ class HBVModel:
         # Save to file
         results_df.to_csv(output_file, index=False)
         print(f"Results saved to {output_file}")
+
+
+    def save_model(self, output_path):
+        """
+        Save the entire model instance to a file using pickle.
+        
+        This saves all model components including:
+        - Parameters
+        - Current states
+        - Input data
+        - Results (if model has been run)
+        - Performance metrics (if calculated)
+        
+        Parameters:
+        -----------
+        output_path : str
+            Path to save the model file. Will create directories if they don't exist.
+        """
+        import pickle
+        import os
+        
+        # Create directory if it doesn't exist
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        
+        # Save the model using pickle
+        with open(output_path, 'wb') as f:
+            pickle.dump(self, f)
+        
+        print(f"Model saved to {output_path}")
+        
+        return None
+
+    def load_model(model_path):
+        """
+        Load a saved HBV model from a file.
+        
+        Parameters:
+        -----------
+        model_path : str
+            Path to the saved model file.
+            
+        Returns:
+        --------
+        HBVModel
+            The loaded model instance.
+        """
+        import pickle
+        
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+        
+        print(f"Model loaded from {model_path}")
+        
+        return model    
