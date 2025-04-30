@@ -21,6 +21,8 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 import os
 import datetime
+from types import MethodType
+from calibration import calibrate_hbv_model
 from hbv_step import hbv_step
 
 class HBVModel:
@@ -68,6 +70,8 @@ class HBVModel:
         self.start_date = None
         self.end_date = None
         self.time_step = 'D'  # Default: daily
+        ##### link externaly defined functions to the model
+        self.calibrate = MethodType(calibrate_hbv_model, self)
     
     def load_data(self, file_path=None, data=None, date_column='Date',
               precip_column='Precipitation', temp_column='Temperature',
@@ -232,6 +236,9 @@ class HBVModel:
         """
         Run the HBV model for the entire simulation period.
         """
+        # Store the initial states to reset them at the end
+        initial_states = self.states
+
         if self.data is None:
             raise ValueError("No data loaded. Use load_data() method first.")
             
@@ -313,6 +320,7 @@ class HBVModel:
         self.results = results
         
         print("Model run completed successfully!")
+        self.states= initial_states  # states restored to the initial
         
         # Calculate performance metrics if observed discharge is available
         if obs_q is not None:
@@ -647,6 +655,7 @@ class HBVModel:
         return None
 
     def load_model(model_path):
+
         """
         Load a saved HBV model from a file.
         
@@ -667,4 +676,5 @@ class HBVModel:
         
         print(f"Model loaded from {model_path}")
         
-        return model    
+        return model
+    

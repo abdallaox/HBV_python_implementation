@@ -1,11 +1,11 @@
-def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100, 
+def calibrate_hbv_model(self, method='SLSQP', objective='NSE', iterations=100, 
                         verbose=True, plot_results=True):
     """
     Calibrate an HBV model's parameters to optimize the objective function.
     
     Parameters:
     -----------
-    model : HBVModel
+    self : HBVmodel
         The HBV model instance to calibrate
     method : str, default 'SLSQP'
         Optimization method to use (see scipy.optimize.minimize).
@@ -33,17 +33,17 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
     import time
     import copy
     
-    if model.data is None:
+    if self.data is None:
         raise ValueError("No data loaded. Use load_data() method first.")
         
     # Check if observed discharge data is available
-    if (model.column_names['obs_q'] is None or 
-        model.column_names['obs_q'] not in model.data.columns):
+    if (self.column_names['obs_q'] is None or 
+        self.column_names['obs_q'] not in self.data.columns):
         raise ValueError("Observed discharge data is required for calibration.")
     # Store the initial states to use it later for reseting the model 
-    initial_states = model.states
+    initial_states = self.states
     # Extract observed discharge data
-    obs_q = model.data[model.column_names['obs_q']].values
+    obs_q = self.data[self.column_names['obs_q']].values
     
     # Get valid indices (where obs_q is not NaN)
     valid_idx = ~np.isnan(obs_q)
@@ -57,7 +57,7 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
     param_groups = []
     
     # Create flat parameter list for optimization
-    for group_name, group in model.params.items():
+    for group_name, group in self.params.items():
         for param_name, param_info in group.items():
             initial_params.append(param_info['default'])
             param_names.append(f"{group_name}_{param_name}")
@@ -78,7 +78,7 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
                 param_dict[group][param_name] = {}
             
             # Copy min/max from original params
-            orig_group = model.params[group]
+            orig_group = self.params[group]
             param_dict[group][param_name]['min'] = orig_group[param_name]['min']
             param_dict[group][param_name]['max'] = orig_group[param_name]['max']
             
@@ -87,9 +87,7 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
         
         return param_dict
     
-    # Helper function to reset model states
-    def reset_model_states(model):
-        model.states = initial_states
+    
     
     # Define the objective function to minimize
     def objective_function(params):
@@ -97,21 +95,19 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
         param_dict = create_param_dict(params)
         
         # Store original parameters to restore later
-        original_params = copy.deepcopy(model.params)
+        original_params = copy.deepcopy(self.params)
         
         # Update model parameters
-        model.params = param_dict
+        self.params = param_dict
         
-        # Reset initial states
-        reset_model_states(model)
         
         # Run the model
-        model.run()
+        self.run()
         
         # Get simulated discharge and valid observed discharge
-        sim_q = model.results['discharge'][valid_idx]
+        sim_q = self.results['discharge'][valid_idx]
         obs_q_valid = obs_q[valid_idx]
-        model.calculate_performance_metrics
+        self.calculate_performance_metrics
         # Calculate objective function value
         if objective == 'NSE':
             # Nash-Sutcliffe Efficiency (to be maximized)
@@ -121,7 +117,7 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
             # value = 1 - (nse_numerator / nse_denominator)
             # # For minimization, return negative NSE
             
-            return - model.performance_metrics['NSE']
+            return - self.performance_metrics['NSE']
             
         elif objective == 'KGE':
             # # Kling-Gupta Efficiency (to be maximized)
@@ -136,17 +132,17 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
             
             # kge = 1 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2)
             # For minimization, return negative KGE
-            return - model.performance_metrics['KGE']
+            return - self.performance_metrics['KGE']
             
         elif objective == 'RMSE':
             # Root Mean Square Error (to be minimized)
             # rmse = np.sqrt(np.mean((obs_q_valid - sim_q) ** 2))
-            return model.performance_metrics['RMSE']
+            return self.performance_metrics['RMSE']
             
         elif objective == 'MAE':
             # Mean Absolute Error (to be minimized)
             # mae = np.mean(np.abs(obs_q_valid - sim_q))
-            return model.performance_metrics['MAE']
+            return self.performance_metrics['MAE']
         
         else:
             raise ValueError(f"Unknown objective function: {objective}")
@@ -182,7 +178,7 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
         print(f"Optimizing {objective} with {len(param_names)} parameters and {iterations} iterations")
     
     # Store original parameters to restore if needed
-    original_params = copy.deepcopy(model.params)
+    original_params = copy.deepcopy(self.params)
     
     try:
         # Run optimization
@@ -202,14 +198,14 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
         optimized_params = create_param_dict(opt_params)
         
         # Update model with optimized parameters
-        model.params = optimized_params
+        self.params = optimized_params
         
         # Run the model with optimized parameters
-        reset_model_states(model)
-        model.run()
+        
+        self.run()
         
         # Calculate final performance metrics
-        model.calculate_performance_metrics()
+        self.calculate_performance_metrics()
         
         # Display results
         if verbose:
@@ -224,22 +220,22 @@ def calibrate_hbv_model(model, method='SLSQP', objective='NSE', iterations=100,
                     print(f"  {param_name}: {param_info['default']:.4f} (range: {param_info['min']}-{param_info['max']})")
             
             print("\nPerformance Metrics:")
-            for metric, value in model.performance_metrics.items():
+            for metric, value in self.performance_metrics.items():
                 print(f"  {metric}: {value:.4f}")
         
         # Plot results if requested
         if plot_results:
-            model.plot_results(show_plots=True)
+            self.plot_results(show_plots=True)
         
         # Return optimized parameters and performance
         return {
             'parameters': optimized_params,
-            'performance': model.performance_metrics,
+            'performance': self.performance_metrics,
             'optimization_result': result
         }
         
     except Exception as e:
         # Restore original parameters on error
-        model.params = original_params
+        self.params = original_params
         print(f"Calibration failed with error: {str(e)}")
         raise
