@@ -23,6 +23,7 @@ import os
 import datetime
 from types import MethodType
 from calibration import calibrate_hbv_model
+from uncertainty import evaluate_uncertainty
 from hbv_step import hbv_step
 
 class HBVModel:
@@ -72,6 +73,7 @@ class HBVModel:
         self.time_step = 'D'  # Default: daily
         ##### link externaly defined functions to the model
         self.calibrate = MethodType(calibrate_hbv_model, self)
+        self.evaluate_uncertainty = MethodType(evaluate_uncertainty, self)
     
     def load_data(self, file_path=None, data=None, date_column='Date',
               precip_column='Precipitation', temp_column='Temperature',
