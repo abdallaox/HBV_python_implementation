@@ -27,6 +27,7 @@ from calibration import calibration
 # from calibration import calibrate_hbv_model
 # from uncertainty import evaluate_uncertainty
 from hbv_step import hbv_step
+from routing import route_with_maxbas
 
 class HBVModel(uncertainty, calibration):
     """
@@ -56,7 +57,8 @@ class HBVModel(uncertainty, calibration):
                 'K1': {'min': 0.05, 'max': 0.5, 'default': 0.2},
                 'K2': {'min': 0.01, 'max': 0.1, 'default': 0.05},
                 'UZL': {'min': 5.0, 'max': 50.0, 'default': 20.0},
-                'PERC': {'min': 0.5, 'max': 3.0, 'default': 1.5}
+                'PERC': {'min': 0.5, 'max': 3.0, 'default': 1.5},
+                'MAXBAS' :{'min': 1, 'max': 10, 'default': 3}  
             }
         }
         
@@ -334,6 +336,18 @@ class HBVModel(uncertainty, calibration):
         # self.storages['lower_storage'] = lower_storage
         
         # Store results
+        # Add routing if MAXBAS > 1
+        maxbas = int(self.params['response']['MAXBAS']['default'])
+        if maxbas > 1:
+            if verbose: 
+                print(f"Applying MAXBAS routing with n={maxbas} time steps")
+            routed_discharge = route_with_maxbas(results['discharge'], maxbas)
+            results['discharge'] = routed_discharge
+            
+            # Also route components if needed
+            results['quick_flow'] = route_with_maxbas(results['quick_flow'], maxbas)
+            results['intermediate_flow'] = route_with_maxbas(results['intermediate_flow'], maxbas)
+            results['baseflow'] = route_with_maxbas(results['baseflow'], maxbas)
         self.results = results
         
         if verbose: print("Model run completed successfully!")
