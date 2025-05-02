@@ -5,7 +5,7 @@ from bokeh.plotting import figure
 from bokeh.io import curdoc
 import numpy as np
 from datetime import datetime, timedelta
-from hbv_model import HBVModel
+from HBV_model import HBVModel
 
 # ==== Load the real model instead of using dummy data ====
 # Load the pre-calibrated model
@@ -175,7 +175,7 @@ def update_plot(attr, old, new):
     tabs.tabs[0] = create_tab("snow", shared_x_range)[0]
     tabs.tabs[1] = create_tab("soil", shared_x_range)[0]
     tabs.tabs[2] = create_tab("response", shared_x_range)[0]
-    tabs.tabs[3] = create_tab("flow_components", shared_x_range)[0]
+    tabs.tabs[3] = create_tab("Flow Components", shared_x_range)[0]
     
     # Get the flow components
     baseflow = results.get('baseflow', np.zeros_like(results['discharge']))
@@ -253,7 +253,7 @@ def update_plot(attr, old, new):
     }
     
     # Update main flow plot title with new metrics
-    main_flow_plot.title.text = f"Simulated vs Observed Flow ({metrics_text})"
+    main_flow_plot.title.text = f"Simulated vs Observed Hydrographs ({metrics_text})"
     
     # Print parameter values for debugging
     print(f"Updated parameters:")
@@ -278,7 +278,7 @@ def calibrate():
     
     print("Calibration applied - restored to pre-calibrated model parameters!")
 
-calibrate_button = Button(label="Calibrate Model", button_type="success")
+calibrate_button = Button(label="Calibrate Model", button_type="success",width_policy="max")
 calibrate_button.on_click(calibrate)
 
 # ==== Create Plot Tabs with Dynamic Content ====
@@ -296,7 +296,7 @@ def create_tab(tab_name, shared_x_range=None):
                          x_range=shared_x_range)
     
     # Second plot with shared x_range (only for non-flow_components tabs)
-    if tab_name != "flow_components":
+    if tab_name != "Flow Components":
         bottom_plot = figure(x_axis_type="datetime", width=800, height=200,
                             tools="pan,wheel_zoom,box_zoom,reset",
                             x_range=top_plot.x_range)  # Link x-axes
@@ -315,7 +315,7 @@ def create_tab(tab_name, shared_x_range=None):
                                       line_width=2, line_dash="dashed", 
                                       color="gray", legend_label=f"TT Threshold")
         
-        top_plot.yaxis.axis_label = "Temperature (°C)"
+        top_plot.yaxis.axis_label = "T (°C)"
         top_plot.legend.location = "top_right"
         
         # Bottom plot: Snow pack and liquid water
@@ -325,7 +325,7 @@ def create_tab(tab_name, shared_x_range=None):
         bottom_plot.line('x', 'y', source=sources["liquid_water"], line_width=2, 
                         color="lightblue", legend_label="Liquid Water")
         
-        bottom_plot.yaxis.axis_label = "Water Equivalent (mm)"
+        bottom_plot.yaxis.axis_label = "Water (mm)"
         bottom_plot.legend.location = "top_right"
         
         return TabPanel(child=column(top_plot, bottom_plot), title=tab_name.capitalize()), top_plot.x_range
@@ -338,7 +338,7 @@ def create_tab(tab_name, shared_x_range=None):
         top_plot.line('x', 'y', source=sources["actual_et"], line_width=2, 
                      color="green", legend_label="Actual ET")
         
-        top_plot.yaxis.axis_label = "Evapotranspiration (mm/day)"
+        top_plot.yaxis.axis_label = "ET (mm/day)"
         top_plot.legend.location = "top_right"
         
         # Bottom plot: Soil moisture with FC threshold
@@ -358,7 +358,7 @@ def create_tab(tab_name, shared_x_range=None):
         
         return TabPanel(child=column(top_plot, bottom_plot), title=tab_name.capitalize()), top_plot.x_range
         
-    elif tab_name == "flow_components":
+    elif tab_name == "Flow Components":
         # Create a single, taller plot for flow components
         flow_plot = figure(x_axis_type="datetime", width=800, height=400,  # Double height
                           tools="pan,wheel_zoom,box_zoom,reset",
@@ -395,14 +395,14 @@ def create_tab(tab_name, shared_x_range=None):
                       #line_dash="dashed",
                       legend_label="Total Discharge")
         
-        flow_plot.yaxis.axis_label = "Flow (mm/day)"
+        flow_plot.yaxis.axis_label = "Discharge (mm/day)"
         flow_plot.legend.location = "top_right"
         
         return TabPanel(child=flow_plot, title=tab_name.capitalize()), top_plot.x_range
         
     else:  # response tab
         # Top plot: Upper zone storage with UZL threshold
-        top_plot.title.text = "Upper Zone Storage"
+        top_plot.title.text = "Upper Tank Storage"
         top_plot.line('x', 'y', source=sources["upper_storage"], line_width=2, 
                      color="purple", legend_label="Upper Storage")
         
@@ -417,7 +417,7 @@ def create_tab(tab_name, shared_x_range=None):
         top_plot.legend.location = "top_right"
         
         # Bottom plot: Lower zone storage
-        bottom_plot.title.text = "Lower Zone Storage"
+        bottom_plot.title.text = "Lower Tank Storage"
         bottom_plot.line('x', 'y', source=sources["lower_storage"], line_width=2, 
                         color="darkblue", legend_label="Lower Storage")
         
@@ -432,13 +432,13 @@ first_tab, shared_x_range = create_tab("snow")
 # Create remaining tabs using the shared x_range
 second_tab, _ = create_tab("soil", shared_x_range)
 third_tab, _ = create_tab("response", shared_x_range)
-fourth_tab, _ = create_tab("flow_components", shared_x_range)  # New tab for flow components
+fourth_tab, _ = create_tab("Flow Components", shared_x_range)  # New tab for flow components
 
 tabs = Tabs(tabs=[first_tab, second_tab, third_tab, fourth_tab])
 
 # ==== Create a taller main flow plot at the bottom ====
 main_flow_plot = figure(x_axis_type="datetime", width=800, height=350,
-                       title=f"Simulated vs Observed Flow ({metrics_text})",
+                       title=f"Simulated vs Observed Hydrographs ({metrics_text})",
                        tools="pan,wheel_zoom,box_zoom,reset,save",
                        x_range=shared_x_range)  # Link x-axes with tabs
 
@@ -459,21 +459,21 @@ left_panel = column(
     Div(text="<h2>HBV Model Parameters</h2>"),
     *slider_groups,
     calibrate_button,
-    width=300, sizing_mode="fixed"
+    width=320, sizing_mode="fixed"
 )
 
 right_panel = column(
-    Div(text="<h2 style='text-align: center'>Model Output</h2>"), 
+    Div(text="<h2 style='text-align: center'>Processes Output</h2>"), 
     tabs,
-    Div(text="<h3 style='text-align: center'>Detailed Flow Analysis</h3>"),
+    Div(text="<h3 style='text-align: center'>Hydrographs</h3>"),
     main_flow_plot,
-    sizing_mode="stretch_width"
+    sizing_mode="fixed"
 )
 
 layout = row(
     left_panel, 
     right_panel,
-    sizing_mode="stretch_width"
+    sizing_mode="fixed"
 )
 
 # Add root to current document (required for bokeh serve)

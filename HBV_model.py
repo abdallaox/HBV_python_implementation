@@ -79,8 +79,8 @@ class HBVModel(uncertainty, calibration):
     
     def load_data(self, file_path=None, data=None, date_column='Date',
               precip_column='Precipitation', temp_column='Temperature',
-              pet_column='PotentialET', obs_q_column=None,
-              start_date=None, end_date=None, date_format=None):
+              pet_column='PotentialET', obs_q_column=None, date_format=None,
+              start_date=None, warmup_end=None, end_date=None  ):
         """
         Load data from file or DataFrame, handling PET interpolation and flexible date parsing.
 
@@ -100,6 +100,9 @@ class HBVModel(uncertainty, calibration):
         end_date : str or datetime, optional
         date_format : str, optional
             Format string for parsing dates (e.g. '%Y%m%d' for '19510601').
+        warmup_end : str or datetime, optional
+            The end date of the warmup period. Data before or at this date will be included
+            in the simulation but excluded from performance evaluation.
         """
         import pandas as pd
 
@@ -178,6 +181,16 @@ class HBVModel(uncertainty, calibration):
             self.time_step = 'Index-based'
             print("No date column found; using index as time step.")
 
+        # Store warmup_end
+        self.warmup_end = None
+        if warmup_end is not None:
+            try:
+                self.warmup_end = pd.to_datetime(warmup_end)
+                print(f"Warmup period ends at: {self.warmup_end}")
+            except:
+                print(f"Warning: Could not parse warmup_end date '{warmup_end}'. 10% warmup period will be used.")
+        else:   print(f"No warmup_end specified. Excluding first 10% of data when evaluating——as warmup period.")
+        
         print(f"Loaded data with {len(self.data)} time steps, from {self.start_date} to {self.end_date}")
 
     
@@ -236,7 +249,7 @@ class HBVModel(uncertainty, calibration):
         print("Initial conditions updated.")
     
     
-    def run(self):
+    def run(self, verbose= True):
         """
         Run the HBV model for the entire simulation period.
         """
@@ -291,7 +304,7 @@ class HBVModel(uncertainty, calibration):
             results['observed_q'] = obs_q
         
         
-        print(f"Starting model run for {n_steps} time steps...")
+        if verbose: print(f"Starting model run for {n_steps} time steps...")
         
         # Main simulation loop
         for t in range(n_steps):
@@ -323,18 +336,20 @@ class HBVModel(uncertainty, calibration):
         # Store results
         self.results = results
         
-        print("Model run completed successfully!")
+        if verbose: print("Model run completed successfully!")
         self.states= initial_states  # states restored to the initial
         
         # Calculate performance metrics if observed discharge is available
         if obs_q is not None:
-            self.calculate_performance_metrics()
+            self.calculate_performance_metrics(verbose)
         
         return results
     
-    def calculate_performance_metrics(self):
+    def calculate_performance_metrics(self, verbose = True):
         """
         Calculate performance metrics if observed discharge is available.
+        Uses the warmup_end parameter that was set during data loading to exclude
+        warmup period from performance evaluation.
         """
         if 'observed_q' not in self.results:
             print("No observed discharge data available for performance evaluation.")
@@ -344,10 +359,35 @@ class HBVModel(uncertainty, calibration):
         sim_q = self.results['discharge']
         obs_q = self.results['observed_q']
         
+        # Define the evaluation period (exclude warmup period)
+        warmup_idx = 0
+        
+        if hasattr(self, 'warmup_end') and self.warmup_end is not None:
+            # If warmup_end is stored in the model and dates are available
+            if 'dates' in self.results:
+                dates = self.results['dates']
+                # Find the index of the first date after warmup_end
+                warmup_idx = np.sum(dates <= self.warmup_end)
+                if verbose: print(f"Excluding data up to {self.warmup_end} ({warmup_idx} timesteps) as warmup period.")
+            else:
+                if verbose: print("Warning: No dates found in results. Unable to apply date-based warmup period.")
+                # Default to 10% if no dates available
+                warmup_idx = int(len(obs_q) * 0.1)
+                if verbose: print(f"Defaulting to exclude first {warmup_idx} timesteps (10% of data) as warmup period.")
+        else:
+            # Default: exclude first 10% of the data
+            warmup_idx = int(len(obs_q) * 0.1)
+            if verbose: print(f"No warmup_end specified. Excluding first {warmup_idx} timesteps (10% of data) as warmup period.")
+        
+        # Apply the warmup period
+        if warmup_idx > 0:
+            sim_q = sim_q[warmup_idx:]
+            obs_q = obs_q[warmup_idx:]
+        
         # Remove NaN values
         valid_idx = ~np.isnan(obs_q)
         if np.sum(valid_idx) == 0:
-            print("No valid observed discharge values found.")
+            print("No valid observed discharge values found after applying warmup period.")
             return
             
         sim_q_valid = sim_q[valid_idx]
@@ -384,13 +424,16 @@ class HBVModel(uncertainty, calibration):
             'PBIAS': pbias,
             'RMSE': rmse,
             'MAE': mae,
-            'r': r         }
-        
-        print(f"Performance metrics calculated:")
-        print(f"NSE: {nse:.3f}")
-        print(f"KGE: {kge:.3f}")
-        print(f"PBIAS: {pbias:.1f}%")
-        print(f"Correlation: {r:.3f}")
+            'r': r,
+           # 'warmup_end': self.warmup_end if hasattr(self, 'warmup_end') else None,
+           # 'warmup_timesteps': warmup_idx
+        }
+        if verbose:
+            print(f"Performance metrics calculated:")
+            print(f"NSE: {nse:.3f}")
+            print(f"KGE: {kge:.3f}")
+            print(f"PBIAS: {pbias:.1f}%")
+            print(f"Correlation: {r:.3f}")
     
     def plot_results(self, output_file=None, show_plots=True):
         """

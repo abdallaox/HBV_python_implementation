@@ -87,7 +87,7 @@ class uncertainty:
                     p['min'] = new_min
                     p['max'] = new_max
                     if verbose:
-                        print(f"Narrowed {p['group']}_{p['name']}: {new_min:.4f} to {new_max:.4f}")        
+                        print(f"Narrowed range {p['group']}_{p['name']}: {new_min:.4f} to {new_max:.4f}")        
             
             # Helper function to create parameter dictionary from sampled values
             def create_param_dict(flat_params):
@@ -115,10 +115,10 @@ class uncertainty:
                 self.states = copy.deepcopy(initial_states)
                 
                 # Run the model
-                self.run()
+                self.run(verbose)
                 
                 # Calculate performance metrics
-                self.calculate_performance_metrics()
+                self.calculate_performance_metrics(verbose)
                 
                 # Return the specified objective
                 if objective == 'NSE':
@@ -148,7 +148,7 @@ class uncertainty:
                 print(f"Evaluating with {objective} as the objective function")
             
             # Run Monte Carlo simulations
-            for i in tqdm(range(n_runs), disable=not verbose):
+            for i in tqdm(range(n_runs), disable= False):
                 # Sample parameters uniformly from their ranges
                 sampled_params = np.array([np.random.uniform(p['min'], p['max']) for p in param_info])
                 
@@ -180,7 +180,7 @@ class uncertainty:
             # Store performance with original (calibrated) parameters
             self.params = original_params
             self.states = copy.deepcopy(initial_states)
-            self.run()
+            self.run(verbose)
             self.calculate_performance_metrics()
             original_performance = self.performance_metrics[objective]
             if objective in ['RMSE', 'MAE']:
@@ -202,13 +202,13 @@ class uncertainty:
             for i in range(save_best):
                 self.params = create_param_dict(best_parameters[i])
                 self.states = copy.deepcopy(initial_states)
-                self.run()
+                self.run(verbose)
                 best_runs_df[f'best_{i+1}'] = self.results['discharge']
             
             # Run model with original parameters to get baseline
             self.params = original_params
             self.states = copy.deepcopy(initial_states)
-            self.run()
+            self.run(verbose)
             best_runs_df['original'] = self.results['discharge']
             
             # Calculate 95% prediction interval from best runs

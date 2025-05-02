@@ -104,7 +104,7 @@ class calibration:
             
             
             # Run the model
-            self.run()
+            self.run(verbose)
             
             # Get simulated discharge and valid observed discharge
             sim_q = self.results['discharge'][valid_idx]
@@ -204,10 +204,10 @@ class calibration:
             
             # Run the model with optimized parameters
             
-            self.run()
+            self.run(verbose)
             
             # Calculate final performance metrics
-            self.calculate_performance_metrics()
+            self.calculate_performance_metrics(verbose)
             
             # Display results
             if verbose:
