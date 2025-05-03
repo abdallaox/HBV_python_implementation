@@ -1,2 +1,30 @@
 HBV_Lab/
 *pycache*/
+
+# .gitignore for HBV_Lab
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+
+# IDE specific files
+.vscode/
+.idea/
+
+# Build/distribution files
+build/
+dist/
+*.egg-info/
+
+# Test/coverage outputs
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
