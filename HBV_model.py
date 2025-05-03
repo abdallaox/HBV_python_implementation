@@ -449,7 +449,7 @@ class HBVModel(uncertainty, calibration):
             print(f"PBIAS: {pbias:.1f}%")
             print(f"Correlation: {r:.3f}")
     
-    def plot_results(self, output_file=None, show_plots=True):
+    def plot_results(self, output_file=None, show_plots=True, exclude_warmup=True):
         """
         Plot model results with customized layout and additional figures.
         
@@ -459,6 +459,8 @@ class HBVModel(uncertainty, calibration):
             If provided, save the plot to this file
         show_plots : bool, default True
             Whether to display the plots
+        exclude_warmup : bool, default True
+            Whether to exclude the warmup period from the plots
         """
         # --- Create directory if it doesn't exist ---
         if output_file is not None:
@@ -468,6 +470,33 @@ class HBVModel(uncertainty, calibration):
         if self.results is None:
             raise ValueError("No results to plot. Run the model first.")
             
+        # Determine the warmup period index
+        warmup_idx = 0
+        
+        if exclude_warmup:
+            if hasattr(self, 'warmup_end') and self.warmup_end is not None:
+                # If warmup_end is stored in the model and dates are available
+                if 'dates' in self.results:
+                    dates = self.results['dates']
+                    # Find the index of the first date after warmup_end
+                    if isinstance(dates[0], (datetime.datetime, np.datetime64)):
+                        warmup_idx = np.sum(dates <= self.warmup_end)
+                        print(f"Excluding data up to {self.warmup_end} ({warmup_idx} timesteps) as warmup period.")
+                    else:
+                        # Default to 10% if dates are not datetime objects
+                        warmup_idx = int(len(dates) * 0.1)
+                        print(f"Dates are not datetime objects. Defaulting to exclude first {warmup_idx} timesteps (10% of data) as warmup period.")
+                else:
+                    # Default to 10% if no dates available
+                    warmup_idx = int(len(self.results['precipitation']) * 0.1)
+                    print(f"No dates found in results. Defaulting to exclude first {warmup_idx} timesteps (10% of data) as warmup period.")
+            else:
+                # Default: exclude first 10% of the data
+                warmup_idx = int(len(self.results['precipitation']) * 0.1)
+                print(f"No warmup_end specified. Excluding first {warmup_idx} timesteps (10% of data) as warmup period.")
+        else:
+            print("Including entire simulation period (including warmup period)")
+        
         # Create a figure with multiple subplots
         fig = plt.figure(figsize=(12, 28))  # Increased height for more subplots
         
@@ -486,23 +515,27 @@ class HBVModel(uncertainty, calibration):
         axs.append(fig.add_subplot(11, 1, 11))  # Discharge components and total
 
         # Get dates for x-axis
-        dates = self.results['dates']
+        dates = self.results['dates'][warmup_idx:] if warmup_idx > 0 else self.results['dates']
         if isinstance(dates[0], (datetime.datetime, np.datetime64)):
             date_formatter = DateFormatter('%Y-%m-%d')
             is_datetime = True
         else:
             is_datetime = False
         
+        # Function to get data with warmup period excluded
+        def get_data(key):
+            return self.results[key][warmup_idx:] if warmup_idx > 0 else self.results[key]
+        
         # 1. Precipitation
         ax1 = axs[0]
-        ax1.bar(dates, self.results['precipitation'], color='skyblue', label='Precipitation')
+        ax1.bar(dates, get_data('precipitation'), color='skyblue', label='Precipitation')
         ax1.set_ylabel('Precipitation (mm)')
         ax1.set_title('Precipitation')
         ax1.legend(loc='upper right')
         
         # 2. Temperature with TT threshold
         ax2 = axs[1]
-        ax2.plot(dates, self.results['temperature'], color='red', label='Temperature')
+        ax2.plot(dates, get_data('temperature'), color='red', label='Temperature')
         ax2.axhline(y=self.params['snow']['TT']['default'], color='gray', linestyle='--', 
                 label=f"TT Threshold ({self.params['snow']['TT']['default']}°C)")
         ax2.set_ylabel('Temperature (°C)')
@@ -511,30 +544,30 @@ class HBVModel(uncertainty, calibration):
         
         # 3. Snow pack and liquid water
         ax3 = axs[2]
-        ax3.plot(dates, self.results['snowpack'], color='blue', label='Snow Pack')
-        ax3.plot(dates, self.results['liquid_water'], color='lightblue', label='Liquid Water')
+        ax3.plot(dates, get_data('snowpack'), color='blue', label='Snow Pack')
+        ax3.plot(dates, get_data('liquid_water'), color='lightblue', label='Liquid Water')
         ax3.set_ylabel('Water (mm)')
         ax3.set_title('Snow Pack and Liquid Water Content')
         ax3.legend(loc='upper right')
         
         # 4. Runoff from snow
         ax4 = axs[3]
-        ax4.plot(dates, self.results['runoff_from_snow'], color='skyblue', label='Runoff from Snow')
+        ax4.plot(dates, get_data('runoff_from_snow'), color='skyblue', label='Runoff from Snow')
         ax4.set_ylabel('Runoff (mm/day)')
         ax4.set_title('Runoff from the Snow Routine')
         ax4.legend(loc='upper right')
         
         # 5. Potential and actual ET
         ax5 = axs[4]
-        ax5.plot(dates, self.results['potential_et'], color='orange', label='Potential ET')
-        ax5.plot(dates, self.results['actual_et'], color='green', label='Actual ET')
+        ax5.plot(dates, get_data('potential_et'), color='orange', label='Potential ET')
+        ax5.plot(dates, get_data('actual_et'), color='green', label='Actual ET')
         ax5.set_ylabel('ET (mm/day)')
         ax5.set_title('Potential and Actual Evapotranspiration')
         ax5.legend(loc='upper right')
         
         # 6. Soil moisture
         ax6 = axs[5]
-        ax6.plot(dates, self.results['soil_moisture'], color='brown', label='Soil Moisture')
+        ax6.plot(dates, get_data('soil_moisture'), color='brown', label='Soil Moisture')
         ax6.axhline(y=self.params['soil']['FC']['default'], color='gray', linestyle='--', 
                 label=f"Field Capacity ({self.params['soil']['FC']['default']:.2f} mm)")
         ax6.set_ylabel('Soil Moisture (mm)')
@@ -543,41 +576,40 @@ class HBVModel(uncertainty, calibration):
         
         # 7. Recharge (output from soil to response routine)
         ax7 = axs[6]
-        ax7.plot(dates, self.results['recharge'], color='purple',linewidth=0.5, label='Recharge')
-        ax7.plot(dates, self.results['runoff_soil'], color='red',linewidth=0.5, label='Runoff (overflow from soil))')
-        # ax7.plot(dates, self.results['recharge'] + self.results['runoff_soil'], 
-        #         color='darkviolet', linestyle='--', linewidth=1, label='Total to Response')
+        ax7.plot(dates, get_data('recharge'), color='purple',linewidth=0.5, label='Recharge')
+        ax7.plot(dates, get_data('runoff_soil'), color='red',linewidth=0.5, label='Runoff (overflow from soil)')
         ax7.set_ylabel('Water (mm/day)')
         ax7.set_title('Soil Output to the Response Routine')
         ax7.legend(loc='upper right')
         
         # 8. upper storages
         ax8 = axs[7]
-        ax8.plot(dates, self.results['upper_storage'], color='lightcoral', label='Upper Storage')
+        ax8.plot(dates, get_data('upper_storage'), color='lightcoral', label='Upper Storage')
         ax8.axhline(y=self.params['response']['UZL']['default'], color='gray', linestyle='--', label='Fast Response Threshold (ULZ)')
-        ax8.set_ylabel('storage (mm)')
-        ax8.set_title('Upper tank Storages')
+        ax8.set_ylabel('Storage (mm)')
+        ax8.set_title('Upper Tank Storages')
         ax8.legend(loc='upper right')
-        # 8. Groundwater storages
+        
+        # 9. Groundwater storages
         ax9 = axs[8]
-        ax9.plot(dates, self.results['lower_storage'], color='darkblue', label='Lower Storage')
+        ax9.plot(dates, get_data('lower_storage'), color='darkblue', label='Lower Storage')
         ax9.set_ylabel('Storage (mm)')
-        ax9.set_title('Lower tank Storages')
+        ax9.set_title('Lower Tank Storages')
         ax9.legend(loc='upper right')
         
-        # 9. Discharge Components (Stacked)
+        # 10. Discharge Components (Stacked)
         ax10 = axs[9]
         
         # Stackplot with components only
         ax10.stackplot(dates,
-                    self.results['baseflow'],
-                    self.results['intermediate_flow'],
-                    self.results['quick_flow'],
+                    get_data('baseflow'),
+                    get_data('intermediate_flow'),
+                    get_data('quick_flow'),
                     labels=['Baseflow', 'Intermediate Flow', 'Quick Flow'],
                     colors=['royalblue', 'darkorange', 'tomato'])
         
         # Add total discharge line
-        ax10.plot(dates, self.results['discharge'], 
+        ax10.plot(dates, get_data('discharge'), 
                 color='black', linestyle=':', linewidth=0.5,
                 label='Total Discharge (sum)')
         
@@ -585,17 +617,17 @@ class HBVModel(uncertainty, calibration):
         ax10.set_title('Runoff Components (Stacked)')
         ax10.legend(loc='upper right')
         
-        # 10. Discharge Comparison (Total vs Observed)
+        # 11. Discharge Comparison (Total vs Observed)
         ax11 = axs[10]
         
         # Plot simulated total
-        ax11.plot(dates, self.results['discharge'], 
+        ax11.plot(dates, get_data('discharge'), 
                 color='darkgreen', linewidth=2,
                 label='Simulated Discharge')
         
         # Plot observed if available
         if 'observed_q' in self.results:
-            ax11.plot(dates, self.results['observed_q'], 
+            ax11.plot(dates, get_data('observed_q'), 
                     color='black', linestyle='--', linewidth=1.5,
                     label='Observed Discharge')
             
@@ -603,9 +635,11 @@ class HBVModel(uncertainty, calibration):
             if hasattr(self, 'performance_metrics'):
                 metrics = self.performance_metrics
                 ax11.set_title(
-                    f"Discharge Comparison (NSE: {metrics['NSE']:.2f}, KGE: {metrics['KGE']:.2f}, PBIAS: {metrics['PBIAS']:.2f})"
+                    f"Discharge Comparison (NSE: {metrics['NSE']:.2f}, KGE: {metrics['KGE']:.2f}, PBIAS: {metrics['PBIAS']:.2f}) "
+                    
                 )
-            else: ax11.set_title('Discharge Comparison')
+            else: 
+                ax11.set_title('Discharge Comparison')
         
         ax11.set_ylabel('Discharge (mm/day)')
         ax11.set_xlabel('Date')
@@ -621,12 +655,12 @@ class HBVModel(uncertainty, calibration):
         plt.tight_layout()
         
         if output_file:
-                plt.savefig(output_file, dpi=300, bbox_inches='tight')
-                print(f"Figure saved to {output_file}")
+            plt.savefig(output_file, dpi=300, bbox_inches='tight')
+            print(f"Figure saved to {output_file}")
             
         if show_plots:
-                plt.show()
-        return None    
+            plt.show()
+        return None  
         
     def save_results(self, output_file):
         """
