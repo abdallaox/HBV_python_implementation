@@ -42,7 +42,7 @@ class HBVModel(uncertainty, calibration):
             'snow': {
                 'TT': {'min': -2.0, 'max': 2.0, 'default': 0.0},
                 'CFMAX': {'min': 1.0, 'max': 6.0, 'default': 3.5},
-                'PCF': {'min': 0.5, 'max': 1.5, 'default': 1.0},
+               # 'PCF': {'min': 0.5, 'max': 1.5, 'default': 1.0},
                 'SFCF': {'min': 0.5, 'max': 1.5, 'default': 1.0},
                 'CFR': {'min': 0.0, 'max': 0.2, 'default': 0.05},
                 'CWH': {'min': 0.0, 'max': 0.2, 'default': 0.1}

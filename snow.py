@@ -27,11 +27,11 @@ def snow_routine(precipitation, temperature, snowpack, liquid_water, params):
     CFR = params['CFR']['default']
     CWH = params['CWH']['default']
     SFCF = params['SFCF']['default']
-    PCF = params['PCF']['default']
+    #PCF = params['PCF']['default']
     
     # Give the model a room to account for any biases in the estimation of precipitation
 
-    precipitation= precipitation * PCF
+    precipitation= precipitation 
 
     # Initialize snowfall and rainfall
     snowfall = 0.0
@@ -58,20 +58,6 @@ def snow_routine(precipitation, temperature, snowpack, liquid_water, params):
         snowpack -= melt
         liquid_water += melt + rainfall
     
-    
- 
-
-    if temperature > TT:
-        melt = CFMAX * (temperature - TT)
-        melt = min(melt, snowpack)  # Cannot melt more than available snow
-        snowpack -= melt
-        liquid_water += melt + rainfall
-    else:
-        refreeze = CFR * CFMAX * (TT - temperature)
-        refreeze = min(refreeze, liquid_water)
-        snowpack += refreeze
-        liquid_water -= refreeze
-       
 
     # Water release from snowpack if above holding capacity
     holding_capacity = CWH * snowpack
