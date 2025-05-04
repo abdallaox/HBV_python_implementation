@@ -81,7 +81,7 @@ class HBVModel(uncertainty, calibration):
     
     def load_data(self, file_path=None, data=None, date_column='Date',
               precip_column='Precipitation', temp_column='Temperature',
-              pet_column='PotentialET', obs_q_column=None, date_format=None,
+              pet_column='PotentialET', obs_q_column=None, date_format='%Y%m%d',
               start_date=None, warmup_end=None, end_date=None  ):
         """
         Load data from file or DataFrame, handling PET interpolation and flexible date parsing.
@@ -118,10 +118,9 @@ class HBVModel(uncertainty, calibration):
 
         if has_date:
             try:
-                if date_format:
-                    data[date_column] = pd.to_datetime(data[date_column], format=date_format)
-                else:
-                    data[date_column] = pd.to_datetime(data[date_column])
+               
+                data[date_column] = pd.to_datetime(data[date_column], format=date_format)
+               
             except Exception as e:
                 print(f"Warning: Failed to convert {date_column} to datetime. {e}")
                 has_date = False
@@ -152,12 +151,28 @@ class HBVModel(uncertainty, calibration):
                 merge_col = date_column if has_date else 'index'
                 data = data.reset_index().merge(daily_df[[merge_col, 'pet']], on=merge_col, how='left').set_index('index')
                 data = data.rename(columns={'pet': pet_column})
-
+        
         if has_date:
+            # Convert all dates to datetime objects first
+            start_dt = pd.to_datetime(start_date, format=date_format) if start_date else None
+            end_dt = pd.to_datetime(end_date, format=date_format) if end_date else None
+            warmup_dt = pd.to_datetime(warmup_end, format=date_format) if warmup_end else None
+            
+            # Validate date order
+            if start_dt is not None and end_dt is not None:
+                if start_dt >= end_dt:
+                    raise ValueError("start_date must be earlier than end_date")
+            
+            if warmup_dt is not None:
+                if start_dt is not None and warmup_dt <= start_dt:
+                    raise ValueError("warmup_end must be after start_date")
+                if end_dt is not None and warmup_dt >= end_dt:
+                    raise ValueError("warmup_end must be before end_date")
+            # apply filtering    
             if start_date is not None:
-                data = data[data[date_column] >= pd.to_datetime(start_date)]
+                data = data[data[date_column] >= pd.to_datetime(start_date,format=date_format)]
             if end_date is not None:
-                data = data[data[date_column] <= pd.to_datetime(end_date)]
+                data = data[data[date_column] <= pd.to_datetime(end_date,format=date_format)]
 
         self.data = data.reset_index(drop=True)
         self.column_names = {
@@ -180,14 +195,16 @@ class HBVModel(uncertainty, calibration):
         else:
             self.start_date = None
             self.end_date = None
+            warmup_end = None
             self.time_step = 'Index-based'
             print("No date column found; using index as time step.")
+             
 
         # Store warmup_end
         self.warmup_end = None
         if warmup_end is not None:
             try:
-                self.warmup_end = pd.to_datetime(warmup_end)
+                self.warmup_end = pd.to_datetime(warmup_end, format=date_format)
                 print(f"Warmup period ends at: {self.warmup_end}")
             except:
                 print(f"Warning: Could not parse warmup_end date '{warmup_end}'. 10% warmup period will be used.")
