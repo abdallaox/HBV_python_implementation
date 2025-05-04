@@ -28,4 +28,6 @@ model.load_model("path")
 ```
 It is very intuitive—the model is like an object which has attributes (data, parameters, initial_conditions, etc.) that you can assign and access. The object also performs functions (calibration, uncertainty estimation, save, load, etc.)
 ### Tutorial
-Start by following the notebook: **quick_start_guide.ipynb**
+Start by following the notebook:  [**quick_start_guide.ipynb**](quick_start_guide.ipynb)
+### Play with HBV 
+Get a feeling of how HBV work and what impact different parametrs have in [**HBVLAB**](https://www.linkedin.com/in/abdallaimam/) 
