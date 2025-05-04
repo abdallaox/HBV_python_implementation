@@ -11,7 +11,7 @@ __pycache__/
 # Virtual environment
 venv/
 .env/
-
+.pypirc
 # IDE specific files
 .vscode/
 .idea/
