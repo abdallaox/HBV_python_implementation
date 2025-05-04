@@ -12,7 +12,7 @@ This can be flexibly used for different modelling tasks, but can also be used in
 ```bash
 pip install HBV_Lab
 ```
-### How to use
+### How to Use
 It is very intuitive—you create a model like an object which has attributes (data, parameters, initial conditions, etc.) that you can assign and access. The object also performs functions (calibration, uncertainty estimation, save, load, etc.)
 ```python
 from HBV_Lab import HBVModel
