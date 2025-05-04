@@ -13,7 +13,7 @@ This can be flexibly used for different modelling tasks, but can also be used in
 pip install HBV_Lab
 ```
 ### How to use
-It is very intuitive—the model is like an object which has attributes (data, parameters, initial_conditions, etc.) that you can assign and access. The object also performs functions (calibration, uncertainty estimation, save, load, etc.)
+It is very intuitive—you create a model like an object which has attributes (data, parameters, initial conditions, etc.) that you can assign and access. The object also performs functions (calibration, uncertainty estimation, save, load, etc.)
 ```python
 from HBV_Lab import HBVModel
 model = HBVModel()
@@ -28,6 +28,10 @@ model.save_model("path")
 model.load_model("path")
 ```
 ### Tutorial
-Start by following the notebook:  [**quick_start_guide.ipynb**](quick_start_guide.ipynb)
+Start by following a simple case study in the notebook:  [**quick_start_guide.ipynb**](quick_start_guide.ipynb)
 ### Play with HBV 
-Get a feeling of how HBV work and what impact different parametrs have in [**HBVLAB**](https://www.linkedin.com/in/abdallaimam/) 
+Get a feeling of how HBV model work and the role of the different parameters in [**HBVLAB**](https://www.linkedin.com/in/abdallaimam/) (which uses a model developed with this HBV implementation).
+### References 
+HBV model:
+Data used for the case study
+more about the subject 
