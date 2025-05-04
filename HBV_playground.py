@@ -104,6 +104,7 @@ sources = {
     ))
 }
 
+
 # Create source for metrics
 metrics_source = ColumnDataSource(data=dict(
     text=[metrics_text]
@@ -126,7 +127,8 @@ for group_name, group_params in params.items():
             end=meta['max'], 
             value=meta['default'], 
             step=0.001,
-            format="0.000"
+            format="0.000",
+            tooltips= True,
         )
         sliders[key] = slider
         group_sliders.append(slider)
