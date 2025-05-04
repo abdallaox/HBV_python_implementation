@@ -278,9 +278,6 @@ def calibrate():
     
     print("Calibration applied - restored to pre-calibrated model parameters!")
 
-calibrate_button = Button(label="Calibrate Model", button_type="success",width_policy="max")
-calibrate_button.on_click(calibrate)
-
 # ==== Create Plot Tabs with Dynamic Content ====
 def create_tab(tab_name, shared_x_range=None):
     """Create a tab with plots that change based on the tab name"""
@@ -454,28 +451,116 @@ main_flow_plot.yaxis.axis_label = "Discharge (mm/day)"
 main_flow_plot.legend.location = "top_left"
 main_flow_plot.grid.grid_line_alpha = 0.3
 
-# ==== Final Layout ====
-left_panel = column(
-    Div(text="<h2>HBV Model Parameters</h2>"),
-    *slider_groups,
-    calibrate_button,
-    width=320, sizing_mode="fixed"
+# ==== FINAL LAYOUT WITH ALWAYS-VISIBLE SCROLLBAR ====
+# Create the title DIV (fixed, outside scroll area)
+title_div = Div(
+    text="<h2 style='text-align: left; margin-bottom: 10px; padding-left: 18px;'>HBV Model Parameters</h2>",
+    width=320,
+    styles={'margin-left': '0px'}
 )
 
+# Create the scrollable content panel (just sliders now)
+scrollable_content = column(
+    *slider_groups,
+    width=310,  # Narrower to account for scrollbar
+    height=790,  # Reduced height since button is outside
+    sizing_mode="inherit",
+    styles={
+        'overflow-y': 'scroll',
+        'overflow-x': 'hidden',
+        'padding-left': '25px',  # Space between scrollbar and content
+        'padding-right': '25px', 
+        'direction': 'rtl',  # Scrollbar on left
+    },
+    stylesheets=[
+        """
+        :host {
+            scrollbar-width: thin;
+            scrollbar-color: #c1c1c1 #f1f1f1;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        /* Content alignment */
+        .bk-panel-models-column-Column {
+            direction: ltr;
+            text-align: left;
+        }
+        
+        /* Slider titles and values */
+        .bk-slider-title {
+            text-align: left !important;
+            padding-left: 5px !important;
+            margin-left: 0px !important;
+        }
+        .bk-slider-value {
+            text-align: left !important;
+            margin-left: 0px !important;
+            padding-left: 5px !important;
+        }
+        
+        /* Parameter group headers */
+        .bk-Div {
+            text-align: left !important;
+            padding-left: 5px !important;
+        }
+        
+        /* Slider widget alignment */
+        .bk-input-group {
+            margin-left: 0px !important;
+            padding-left: 5px !important;
+        }
+        """
+    ]
+)
+
+# Create Calibrate button (now outside scroll area)
+calibrate_button = Button(
+    label="Calibrate Model", 
+    button_type="success",
+    width=270,
+    styles={'margin-left': '18px', 'margin-top': '10px'}
+)
+# Connect the button to the calibrate function
+calibrate_button.on_click(calibrate)
+
+# Combine all elements
+parameters_panel = column(
+    title_div,
+    scrollable_content,
+    calibrate_button,  # Now below scroll area
+    width=320,
+    sizing_mode="fixed",
+    styles={'margin-right': '10px'}
+)
+
+# Adjust right panel spacing
 right_panel = column(
     Div(text="<h2 style='text-align: center'>Processes Output</h2>"), 
     tabs,
     Div(text="<h3 style='text-align: center'>Hydrographs</h3>"),
     main_flow_plot,
-    sizing_mode="fixed"
+    sizing_mode="fixed",
+    styles={'margin-left': '10px'}
 )
-
 layout = row(
-    left_panel, 
+    parameters_panel, 
     right_panel,
     sizing_mode="fixed"
 )
 
-# Add root to current document (required for bokeh serve)
+# Add to document
 curdoc().add_root(layout)
 curdoc().title = "HBV Model Dashboard"
