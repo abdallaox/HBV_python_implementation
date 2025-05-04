@@ -36,3 +36,5 @@ Get a feeling of how HBV model work and the role of the different parameters in 
 
 [2] Seibert, J. and Vis, M. J. P.: Teaching hydrological modeling with a user-friendly catchment-runoff-model software package, Hydrol. Earth Syst. Sci., 16, 3315–3325, https://doi.org/10.5194/hess-16-3315-2012, 2012.
 
+[3] AghaKouchak, A., Nakhjiri, N., and Habib, E.: An educational model for ensemble streamflow simulation and uncertainty analysis, Hydrol. Earth Syst. Sci., 17, 445–452, https://doi.org/10.5194/hess-17-445-2013, 2013.
+
