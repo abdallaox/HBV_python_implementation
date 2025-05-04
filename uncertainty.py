@@ -153,7 +153,7 @@ class uncertainty:
             print(f"Evaluating with {objective} as the objective function")
         
         # Run Monte Carlo simulations
-        for i in tqdm(range(n_runs), disable=not verbose):
+        for i in tqdm(range(n_runs)):
             # Sample parameters uniformly from their ranges
             sampled_params = np.array([np.random.uniform(p['min'], p['max']) for p in param_info])
             
@@ -263,7 +263,7 @@ class uncertainty:
             plt.plot(plot_dates[valid_obs], plot_df['observed'][valid_obs], 'k.', 
                      markersize=3, label='Observed')
             
-            plt.title(f'Uncertainty Analysis Results (n={n_runs}, objective={objective})')
+            plt.title(f'Uncertainty Analysis Results (n={n_runs})')
             plt.xlabel('Time')
             plt.ylabel('Discharge (mm/day)')
             
@@ -289,7 +289,7 @@ class uncertainty:
                 better_text = "better" if best_vs_original < 0 else "worse"
                 diff_text = f"Best run is {abs(best_vs_original):.4f} {better_text} than calibrated run"
             
-            plt.figtext(0.5, 0.01, diff_text, ha='center', fontsize=12)
+            plt.figtext(0.5, 0.002, diff_text, ha='center', fontsize=12)
             
             plt.tight_layout()
             plt.show()
