@@ -112,6 +112,7 @@ metrics_source = ColumnDataSource(data=dict(
     text=[metrics_text]
 ))
 
+
 # ==== Parameter Definitions (using model parameters) ====
 # Create empty dictionary to store sliders
 sliders = {}
@@ -134,8 +135,27 @@ for group_name, group_params in params.items():
         )
         sliders[key] = slider
         group_sliders.append(slider)
+        
     
     slider_groups.append(column(header, *group_sliders))
+
+    # Create dummy spacers (adjust heights as needed)
+    top_dummy_spacer = Div(
+        text="""<div style="visibility: hidden; height: 500px;"></div>""",
+        width=300
+    )
+
+    bottom_dummy_spacer = Div(
+        text="""<div style="visibility: hidden; height: 500px;"></div>""",
+        width=300
+    )
+
+    # Create new slider groups with spacers
+    slider_groups_with_spacers = (
+        [top_dummy_spacer] + 
+        slider_groups + 
+        [bottom_dummy_spacer]
+    )
 
 # ==== Update Function using the real model ====
 def update_plot(attr, old, new):
@@ -465,7 +485,7 @@ title_div = Div(
 
 # Create the scrollable content panel (just sliders now)
 scrollable_content = column(
-    *slider_groups,
+    *slider_groups_with_spacers,
     width=310,  # Narrower to account for scrollbar
     height=790,  # Reduced height since button is outside
     sizing_mode="inherit",
@@ -567,3 +587,4 @@ layout = row(
 
 # Add to document
 curdoc().add_root(layout)
+curdoc().title = "HBV Model Dashboard"
