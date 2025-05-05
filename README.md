@@ -42,10 +42,11 @@ model.load_model("path")
 Start by following a simple case study in the notebook:  [**quick_start_guide.ipynb**](https://github.com/abdallaox/HBV_python_implementation/blob/main/quick_start_guide.ipynb)
 ### Play with HBV 
 Get a feeling of how HBV model work and the role of the different parameters in [**HBVLAB**](https://hbv-playground.onrender.com/HBV_playground) (which uses a model developed with this HBV implementation).
-### References 
-**[1]**    Bergström, S., & Forsman, A. (1973). DEVELOPMENT OF A CONCEPTUAL DETERMINISTIC RAINFALL-RUNOFF MODEL. Hydrology Research, 4, 147-170.
+### References
 
-**[2]**    Seibert, J. and Vis, M. J. P.: Teaching hydrological modeling with a user-friendly catchment-runoff-model software package, Hydrol. Earth Syst. Sci., 16, 3315–3325, https://doi.org/10.5194/hess-16-3315-2012, 2012.
+**[1]** Bergström, S., & Forsman, A. (1973). Development of a conceptual deterministic rainfall-runoff model. *Hydrology Research*, *4*, 147-170.
 
-**[3]**     AghaKouchak, A., Nakhjiri, N., and Habib, E.: An educational model for ensemble streamflow simulation and uncertainty analysis, Hydrol. Earth Syst. Sci., 17, 445–452, https://doi.org/10.5194/hess-17-445-2013, 2013.
+**[2]** Seibert, J., & Vis, M. J. P. (2012). Teaching hydrological modeling with a user-friendly catchment-runoff-model software package. *Hydrology and Earth System Sciences*, *16*(9), 3315-3325. [doi:10.5194/hess-16-3315-2012](https://doi.org/10.5194/hess-16-3315-2012)
+
+**[3]** AghaKouchak, A., Nakhjiri, N., & Habib, E. (2013). An educational model for ensemble streamflow simulation and uncertainty analysis. *Hydrology and Earth System Sciences*, *17*(2), 445-452. [doi:10.5194/hess-17-445-2013](https://doi.org/10.5194/hess-17-445-2013)
 
