@@ -20,8 +20,9 @@ This can be flexibly used for different modelling tasks, but can also be used in
 ## Get Started
 
 ### Install the Package
-```bash
-pip install HBV_Lab
+```python 
+pip install HBV_Lab       or
+! pip install HBV_Lab
 ```
 ### How to Use
 It is very intuitive—you create a model like an object which has attributes (data, parameters, initial conditions, etc.) that you can assign and access. The object also performs functions (calibration, uncertainty estimation, save, load, etc.)
@@ -41,7 +42,7 @@ model.load_model("path")
 ### Tutorial
 Start by following a simple case study in the notebook:  [**quick_start_guide.ipynb**](https://github.com/abdallaox/HBV_python_implementation/blob/main/quick_start_guide.ipynb)
 ### Play with HBV 
-Get a feeling of how HBV model work and the role of the different parameters in [**HBVLAB**](https://hbv-playground.onrender.com/HBV_playground) (which uses a model developed with this HBV implementation).
+Get a feeling of how the model works and the role of the different parameters in [**HBVLAB**](https://hbv-playground.onrender.com/HBV_playground)—a playground that uses a model developed with this implementation.
 ### References
 
 **[1]** Bergström, S., & Forsman, A. (1973). Development of a conceptual deterministic rainfall-runoff model. *Hydrology Research*, *4*, 147-170.
