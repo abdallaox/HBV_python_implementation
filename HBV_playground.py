@@ -567,4 +567,3 @@ layout = row(
 
 # Add to document
 curdoc().add_root(layout)
-curdoc().title = "HBV Model Dashboard"
