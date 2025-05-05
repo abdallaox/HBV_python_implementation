@@ -39,9 +39,9 @@ model.save_model("path")
 model.load_model("path")
 ```
 ### Tutorial
-Start by following a simple case study in the notebook:  [**quick_start_guide.ipynb**](quick_start_guide.ipynb)
+Start by following a simple case study in the notebook:  [**quick_start_guide.ipynb**](https://github.com/abdallaox/HBV_python_implementation/blob/main/quick_start_guide.ipynb)
 ### Play with HBV 
-Get a feeling of how HBV model work and the role of the different parameters in [**HBVLAB**](https://www.linkedin.com/in/abdallaimam/) (which uses a model developed with this HBV implementation).
+Get a feeling of how HBV model work and the role of the different parameters in [**HBVLAB**](https://hbv-playground.onrender.com/HBV_playground) (which uses a model developed with this HBV implementation).
 ### References 
 **[1]**    Bergström, S., & Forsman, A. (1973). DEVELOPMENT OF A CONCEPTUAL DETERMINISTIC RAINFALL-RUNOFF MODEL. Hydrology Research, 4, 147-170.
 
