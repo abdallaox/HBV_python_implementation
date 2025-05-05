@@ -6,6 +6,8 @@ from bokeh.io import curdoc
 import numpy as np
 from datetime import datetime, timedelta
 from HBV_model import HBVModel
+from bokeh.models import CustomJS
+
 
 
 
@@ -106,6 +108,22 @@ sources = {
     ))
 }
 
+# Create additional sources for threshold lines
+threshold_sources = {
+    "tt_threshold": ColumnDataSource(data=dict(
+        x=[dates.iloc[0], dates.iloc[-1]],
+        y=[params['snow']['TT']['default'], params['snow']['TT']['default']]
+    )),
+    "fc_threshold": ColumnDataSource(data=dict(
+        x=[dates.iloc[0], dates.iloc[-1]],
+        y=[params['soil']['FC']['default'], params['soil']['FC']['default']]
+    )),
+    "uzl_threshold": ColumnDataSource(data=dict(
+        x=[dates.iloc[0], dates.iloc[-1]],
+        y=[params['response']['UZL']['default'], params['response']['UZL']['default']]
+    ))
+}
+
 
 # Create source for metrics
 metrics_source = ColumnDataSource(data=dict(
@@ -141,7 +159,7 @@ for group_name, group_params in params.items():
 
     # Create dummy spacers (adjust heights as needed)
     top_dummy_spacer = Div(
-        text="""<div style="visibility: hidden; height: 500px;"></div>""",
+        text="""<div style="visibility: hidden; height: 250px;"></div>""",
         width=300
     )
 
@@ -195,11 +213,19 @@ def update_plot(attr, old, new):
     # Update metrics source
     metrics_source.data = {'text': [metrics_text]}
     
-    # Update threshold lines in plots by recreating the tabs
-    tabs.tabs[0] = create_tab("snow", shared_x_range)[0]
-    tabs.tabs[1] = create_tab("soil", shared_x_range)[0]
-    tabs.tabs[2] = create_tab("response", shared_x_range)[0]
-    tabs.tabs[3] = create_tab("Flow Components", shared_x_range)[0]
+    # Update threshold sources
+    threshold_sources["tt_threshold"].data = {
+        'x': [dates.iloc[0], dates.iloc[-1]],
+        'y': [sliders['TT'].value, sliders['TT'].value]
+    }
+    threshold_sources["fc_threshold"].data = {
+        'x': [dates.iloc[0], dates.iloc[-1]],
+        'y': [sliders['FC'].value, sliders['FC'].value]
+    }
+    threshold_sources["uzl_threshold"].data = {
+        'x': [dates.iloc[0], dates.iloc[-1]],
+        'y': [sliders['UZL'].value, sliders['UZL'].value]
+    }
     
     # Get the flow components
     baseflow = results.get('baseflow', np.zeros_like(results['discharge']))
@@ -329,10 +355,9 @@ def create_tab(tab_name, shared_x_range=None):
         top_plot.line('x', 'y', source=sources["temperature"], line_width=2, 
                      color="red", legend_label="Temperature")
         
-        # Add TT threshold line
-        tt_value = sliders['TT'].value
-        threshold_line = top_plot.line(x=[dates[0],dates[-1:]], 
-                                      y=[tt_value, tt_value], 
+        # Add TT threshold line using the threshold source
+        threshold_line = top_plot.line('x', 'y', 
+                                      source=threshold_sources["tt_threshold"], 
                                       line_width=2, line_dash="dashed", 
                                       color="gray", legend_label=f"TT Threshold")
         
@@ -367,10 +392,9 @@ def create_tab(tab_name, shared_x_range=None):
         bottom_plot.line('x', 'y', source=sources["soil"], line_width=2, 
                         color="brown", legend_label="Soil Moisture")
         
-        # Add FC threshold line
-        fc_value = sliders['FC'].value
-        fc_line = bottom_plot.line(x=[dates[0],dates[-1:]], 
-                                  y=[fc_value, fc_value], 
+        # Add FC threshold line using the threshold source
+        fc_line = bottom_plot.line('x', 'y', 
+                                  source=threshold_sources["fc_threshold"], 
                                   line_width=2, line_dash="dashed", 
                                   color="gray", legend_label=f"Field Capacity (FC)")
         
@@ -427,10 +451,9 @@ def create_tab(tab_name, shared_x_range=None):
         top_plot.line('x', 'y', source=sources["upper_storage"], line_width=2, 
                      color="purple", legend_label="Upper Storage")
         
-        # Add UZL threshold line
-        uzl_value = sliders['UZL'].value
-        uzl_line = top_plot.line(x=[dates[0], dates[-1:]], 
-                                y=[uzl_value, uzl_value], 
+        # Add UZL threshold line using the threshold source
+        uzl_line = top_plot.line('x', 'y', 
+                                source=threshold_sources["uzl_threshold"], 
                                 line_width=2, line_dash="dashed", 
                                 color="gray", legend_label=f"UZL Threshold")
         
@@ -482,6 +505,7 @@ title_div = Div(
     width=320,
     styles={'margin-left': '0px'}
 )
+
 
 # Create the scrollable content panel (just sliders now)
 scrollable_content = column(
@@ -546,6 +570,7 @@ scrollable_content = column(
             margin-left: 0px !important;
             padding-left: 5px !important;
         }
+        
         """
     ]
 )
