@@ -4,7 +4,7 @@ HBV is a simple conceptual hydrological model that simulates the main hydrologic
 
 I've been experimenting with the model lately and—in an endeavour to better understand the logic behind it—I decided to implement my own version—in Python, following an intuitive object-oriented programming approach.
 
-This versioin implements the snow, soil, response and routing routines—controled by 14 calibratable parameters as shown below. In addition to calibration and uncertainty analysis modules.
+This versioin implements the snow, soil, response and routing routines—controled by 14 calibratable parameters as shown below—In addition to calibration and uncertainty analysis modules.
 ```python
 parameters   = {
                   'snow':        ['TT', 'CFMAX', 'SFCF', 'CFR', 'CWH'],
