@@ -1,6 +1,6 @@
-from .snow import snow_routine
-from .soil import soil_routine
-from .response import response_routine_two_tanks
+from snow import snow_routine
+from soil import soil_routine
+from response import response_routine_two_tanks
 
 def hbv_step(precipitation, temperature, potential_et, params, initial_conditions):
     """
