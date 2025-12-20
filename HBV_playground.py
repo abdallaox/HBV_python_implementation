@@ -138,7 +138,7 @@ slider_groups = []
 
 # Iterate through parameter groups from the model
 for group_name, group_params in params.items():
-    header = Div(text=f"<h3>{group_name.capitalize()} Parameters</h3>")
+    header = Div(text=f"<h3>{group_name.capitalize()}</h3>")
     group_sliders = []
     
     for key, meta in group_params.items():
