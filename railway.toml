@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "bokeh serve HBV_playground.py --address=0.0.0.0 --port=$PORT --allow-websocket-origin=*"
+healthcheckPath = "/"
+restartPolicyType = "on_failure"

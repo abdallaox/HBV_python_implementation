@@ -1,418 +1,334 @@
 from bokeh.layouts import column, row
-from bokeh.models import Slider, Button, ColumnDataSource, Div, Toggle
-from bokeh.models import TabPanel, Tabs
+from bokeh.models import (
+    Slider, Button, ColumnDataSource, Div, Toggle,
+    LinearAxis, Range1d, TabPanel, Tabs, Title
+)
 from bokeh.plotting import figure
 from bokeh.io import curdoc
 import numpy as np
-from datetime import datetime, timedelta
 from HBV_model import HBVModel
 
-# ==== Load the pre-calibrated model ====
+# ── Load pre-calibrated model ─────────────────────────────────────────────────
 model = HBVModel.load_model('./models/model_calibrated')
-dates = model.data.Date
+dates  = model.data.Date
 params = model.params
 initial_results = model.run()
 
-# Get initial performance metrics
-metrics_text = ""
-if hasattr(model, 'performance_metrics'):
-    metrics = model.performance_metrics
-    metrics_text = f"NSE: {metrics.get('NSE', 'N/A'):.3f} | KGE: {metrics.get('KGE', 'N/A'):.3f} | PBIAS: {metrics.get('PBIAS', 'N/A'):.2f}%"
+# ── Plot factory ──────────────────────────────────────────────────────────────
+def make_plot(width=860, height=210, shared_x_range=None):
+    kwargs = dict(
+        x_axis_type="datetime", width=width, height=height,
+        tools="pan,wheel_zoom,box_zoom,reset,save",
+        toolbar_location="above",
+    )
+    if shared_x_range is not None:
+        kwargs["x_range"] = shared_x_range
+    p = figure(**kwargs)
+    p.background_fill_color = "#ffffff"
+    p.border_fill_color     = "#ffffff"
+    p.outline_line_color    = "#e2e8f0"
+    p.outline_line_width    = 1
+    p.grid.grid_line_color  = "#f1f5f9"
+    p.grid.grid_line_width  = 1
+    p.axis.axis_label_text_font_size  = "11px"
+    p.axis.major_label_text_font_size = "10px"
+    p.title.text_font_size  = "12px"
+    p.title.text_font_style = "normal"
+    p.title.text_color      = "#334155"
+    return p
 
-# ==== Initialize data sources ====
+# ── Data sources ──────────────────────────────────────────────────────────────
+precip_vals = initial_results['precipitation']
+zeros       = np.zeros_like(precip_vals)
+
 sources = {
-    "flow": ColumnDataSource(data=dict(x=dates, y=initial_results['discharge'])),
-    "observed_flow": ColumnDataSource(data=dict(
-        x=dates, 
-        y=initial_results.get('observed_q', np.zeros_like(initial_results['discharge']))
-    )),
-    "snow": ColumnDataSource(data=dict(x=dates, y=initial_results['snowpack'])),
-    "liquid_water": ColumnDataSource(data=dict(x=dates, y=initial_results['liquid_water'])),
-    "temperature": ColumnDataSource(data=dict(x=dates, y=initial_results['temperature'])),
-    "soil": ColumnDataSource(data=dict(x=dates, y=initial_results['soil_moisture'])),
-    "potential_et": ColumnDataSource(data=dict(x=dates, y=initial_results['potential_et'])),
-    "actual_et": ColumnDataSource(data=dict(x=dates, y=initial_results['actual_et'])),
-    "upper_storage": ColumnDataSource(data=dict(x=dates, y=initial_results['upper_storage'])),
-    "lower_storage": ColumnDataSource(data=dict(x=dates, y=initial_results['lower_storage'])),
-    "quick_flow": ColumnDataSource(data=dict(
-        x=dates, 
-        y=initial_results.get('quick_flow', np.zeros_like(initial_results['discharge']))
-    )),
-    "intermediate_flow": ColumnDataSource(data=dict(
-        x=dates, 
-        y=initial_results.get('intermediate_flow', np.zeros_like(initial_results['discharge']))
-    )),
-    "baseflow": ColumnDataSource(data=dict(
-        x=dates, 
-        y=initial_results.get('baseflow', np.zeros_like(initial_results['discharge']))
-    )),
-    "stacked_flows": ColumnDataSource(data=dict(
+    "flow":             ColumnDataSource(dict(x=dates, y=initial_results['discharge'])),
+    "observed_flow":    ColumnDataSource(dict(x=dates, y=initial_results.get('observed_q', zeros))),
+    "precipitation":    ColumnDataSource(dict(x=dates, top=precip_vals)),
+    "snow":             ColumnDataSource(dict(x=dates, y=initial_results['snowpack'])),
+    "liquid_water":     ColumnDataSource(dict(x=dates, y=initial_results['liquid_water'])),
+    "temperature":      ColumnDataSource(dict(x=dates, y=initial_results['temperature'])),
+    "soil":             ColumnDataSource(dict(x=dates, y=initial_results['soil_moisture'])),
+    "potential_et":     ColumnDataSource(dict(x=dates, y=initial_results['potential_et'])),
+    "actual_et":        ColumnDataSource(dict(x=dates, y=initial_results['actual_et'])),
+    "upper_storage":    ColumnDataSource(dict(x=dates, y=initial_results['upper_storage'])),
+    "lower_storage":    ColumnDataSource(dict(x=dates, y=initial_results['lower_storage'])),
+    "quick_flow":       ColumnDataSource(dict(x=dates, y=initial_results.get('quick_flow',        zeros))),
+    "intermediate_flow":ColumnDataSource(dict(x=dates, y=initial_results.get('intermediate_flow', zeros))),
+    "baseflow":         ColumnDataSource(dict(x=dates, y=initial_results.get('baseflow',          zeros))),
+    "stacked_flows":    ColumnDataSource(dict(
         x=dates,
-        baseflow=initial_results.get('baseflow', np.zeros_like(initial_results['discharge'])),
-        intermediate=initial_results.get('intermediate_flow', np.zeros_like(initial_results['discharge'])),
-        quick=initial_results.get('quick_flow', np.zeros_like(initial_results['discharge'])),
-        baseflow_top=initial_results.get('baseflow', np.zeros_like(initial_results['discharge'])),
-        intermediate_top=initial_results.get('baseflow', np.zeros_like(initial_results['discharge'])) + 
-                        initial_results.get('intermediate_flow', np.zeros_like(initial_results['discharge'])),
-        total=initial_results['discharge']
-    ))
+        baseflow         = initial_results.get('baseflow',          zeros),
+        intermediate     = initial_results.get('intermediate_flow', zeros),
+        quick            = initial_results.get('quick_flow',        zeros),
+        baseflow_top     = initial_results.get('baseflow',          zeros),
+        intermediate_top = (initial_results.get('baseflow', zeros) +
+                            initial_results.get('intermediate_flow', zeros)),
+        total            = initial_results['discharge'],
+    )),
 }
 
-# Threshold sources
 threshold_sources = {
-    "tt_threshold": ColumnDataSource(data=dict(
-        x=[dates.iloc[0], dates.iloc[-1]],
-        y=[params['snow']['TT']['default'], params['snow']['TT']['default']]
-    )),
-    "fc_threshold": ColumnDataSource(data=dict(
-        x=[dates.iloc[0], dates.iloc[-1]],
-        y=[params['soil']['FC']['default'], params['soil']['FC']['default']]
-    )),
-    "uzl_threshold": ColumnDataSource(data=dict(
-        x=[dates.iloc[0], dates.iloc[-1]],
-        y=[params['response']['UZL']['default'], params['response']['UZL']['default']]
-    ))
+    "tt_threshold":  ColumnDataSource(dict(x=[dates.iloc[0], dates.iloc[-1]], y=[params['snow']['TT']['default']]     * 2)),
+    "fc_threshold":  ColumnDataSource(dict(x=[dates.iloc[0], dates.iloc[-1]], y=[params['soil']['FC']['default']]     * 2)),
+    "uzl_threshold": ColumnDataSource(dict(x=[dates.iloc[0], dates.iloc[-1]], y=[params['response']['UZL']['default']]* 2)),
 }
 
-metrics_source = ColumnDataSource(data=dict(text=[metrics_text]))
+# ── Parameter sliders (explicit order: snow → soil → response) ────────────────
+GROUP_ORDER = ['snow', 'soil', 'response']
+ICONS       = {'snow': '❄', 'soil': '🌱', 'response': '💧'}
 
-# ==== Create Parameter Sliders with Minimal Styling ====
-sliders = {}
+sliders       = {}
 slider_groups = []
 
-# Minimal icons
-group_icons = {
-    'snow': '❄',
-    'soil': '🌱',
-    'response': '💧'
-}
-
-for group_name, group_params in params.items():
-    icon = group_icons.get(group_name, '·')
-    header = Div(text=f"""
-        <div style='
-            color: #1f1f1f;
-            padding: 12px 0 8px 0;
-            margin: 16px 0 8px 0;
-            font-size: 13px;
-            font-weight: 500;
-            border-bottom: 1px solid #e5e5e5;
-            letter-spacing: 0.3px;
-        '>
-            <span style='margin-right: 6px;'>{icon}</span>
-            {group_name.upper()}
-        </div>
-    """, width=280)
-    
+for group_name in GROUP_ORDER:
+    group_params = params[group_name]
+    icon = ICONS[group_name]
+    header = Div(
+        text=f"""
+        <div style='color:#1e293b; padding:10px 0 6px; margin:12px 0 4px;
+                    font-size:11px; font-weight:600; letter-spacing:0.5px;
+                    text-transform:uppercase; border-bottom:1px solid #e2e8f0;'>
+            <span style='margin-right:5px;'>{icon}</span>{group_name}
+        </div>""",
+        width=264,
+    )
     group_sliders = []
     for key, meta in group_params.items():
-        slider = Slider(
-            title=key, 
-            start=meta['min'], 
-            end=meta['max'], 
-            value=meta['default'], 
-            step=0.001,
-            format="0.000",
-            tooltips=True,
-            width=280,
-            styles={'margin': '6px 0'}
+        s = Slider(
+            title=key,
+            start=meta['min'], end=meta['max'], value=meta['default'],
+            step=0.001, format="0.000",
+            tooltips=True, width=264,
+            styles={'margin': '3px 0'},
         )
-        sliders[key] = slider
-        group_sliders.append(slider)
-    
-    slider_groups.append(column(header, *group_sliders, spacing=2))
+        sliders[key] = s
+        group_sliders.append(s)
+    slider_groups.append(column(header, *group_sliders, spacing=1))
 
-# Spacers
-top_spacer = Div(text="<div style='height: 16px;'></div>", width=300)
-bottom_spacer = Div(text="<div style='height: 16px;'></div>", width=300)
+# ── Update callback ───────────────────────────────────────────────────────────
+def fmt_metrics(pm):
+    if not pm:
+        return ""
+    nse   = pm.get('NSE',   float('nan'))
+    kge   = pm.get('KGE',   float('nan'))
+    pbias = pm.get('PBIAS', float('nan'))
+    return f"NSE {nse:.3f}  ·  KGE {kge:.3f}  ·  PBIAS {pbias:+.1f}%"
 
-slider_groups_with_spacers = [top_spacer] + slider_groups + [bottom_spacer]
 
-# ==== Update Function ====
 def update_plot(attr, old, new):
-    temp_model = HBVModel()
-    temp_model.data = model.data
-    temp_model.column_names = model.column_names
-    
-    updated_params = {'snow': {}, 'soil': {}, 'response': {}}
-    for group_name, group_params in params.items():
-        for key in group_params:
-            updated_params[group_name][key] = {
-                'min': params[group_name][key]['min'],
-                'max': params[group_name][key]['max'],
-                'default': sliders[key].value
-            }
-    
-    temp_model.params = updated_params
-    results = temp_model.run()
-    
-    # Calculate and update metrics
-    metrics_text = ""
-    if hasattr(temp_model, 'performance_metrics'):
-        metrics = temp_model.performance_metrics
-        metrics_text = f"NSE: {metrics.get('NSE', 'N/A'):.3f} | KGE: {metrics.get('KGE', 'N/A'):.3f} | PBIAS: {metrics.get('PBIAS', 'N/A'):.2f}%"
-    
-    # Update the metrics display
-    metrics_display.text = f"""
-        <div style='
-            background: #f9f9f9;
-            padding: 10px 16px;
-            border-radius: 6px;
-            margin: 0 0 16px 0;
-            border: 1px solid #e5e5e5;
-        '>
-            <div style='font-size: 11px; color: #666; margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;'>
-                Performance Metrics
-            </div>
-            <div style='font-size: 13px; color: #1f1f1f; font-weight: 400; font-family: monospace;'>
-                {metrics_text}
-            </div>
-        </div>
-    """
-    
-    # Update thresholds
-    threshold_sources["tt_threshold"].data = {
-        'x': [dates.iloc[0], dates.iloc[-1]],
-        'y': [sliders['TT'].value, sliders['TT'].value]
-    }
-    threshold_sources["fc_threshold"].data = {
-        'x': [dates.iloc[0], dates.iloc[-1]],
-        'y': [sliders['FC'].value, sliders['FC'].value]
-    }
-    threshold_sources["uzl_threshold"].data = {
-        'x': [dates.iloc[0], dates.iloc[-1]],
-        'y': [sliders['UZL'].value, sliders['UZL'].value]
-    }
-    
-    baseflow = results.get('baseflow', np.zeros_like(results['discharge']))
-    intermediate_flow = results.get('intermediate_flow', np.zeros_like(results['discharge']))
-    quick_flow = results.get('quick_flow', np.zeros_like(results['discharge']))
-    
-    # Update all sources
-    sources["flow"].data = {'x': dates, 'y': results['discharge']}
-    sources["snow"].data = {'x': dates, 'y': results['snowpack']}
-    sources["liquid_water"].data = {'x': dates, 'y': results['liquid_water']}
-    sources["temperature"].data = {'x': dates, 'y': results['temperature']}
-    sources["soil"].data = {'x': dates, 'y': results['soil_moisture']}
-    sources["potential_et"].data = {'x': dates, 'y': results['potential_et']}
-    sources["actual_et"].data = {'x': dates, 'y': results['actual_et']}
-    sources["upper_storage"].data = {'x': dates, 'y': results['upper_storage']}
-    sources["lower_storage"].data = {'x': dates, 'y': results['lower_storage']}
-    sources["quick_flow"].data = {'x': dates, 'y': quick_flow}
-    sources["intermediate_flow"].data = {'x': dates, 'y': intermediate_flow}
-    sources["baseflow"].data = {'x': dates, 'y': baseflow}
-    
-    sources["stacked_flows"].data = {
-        'x': dates,
-        'baseflow': baseflow,
-        'intermediate': intermediate_flow,
-        'quick': quick_flow,
-        'baseflow_top': baseflow,
-        'intermediate_top': baseflow + intermediate_flow,
-        'total': results['discharge']
+    temp = HBVModel()
+    temp.data         = model.data
+    temp.column_names = model.column_names
+    temp.warmup_end   = model.warmup_end
+
+    up = {g: {} for g in GROUP_ORDER}
+    for g in GROUP_ORDER:
+        for key, meta in params[g].items():
+            up[g][key] = {'min': meta['min'], 'max': meta['max'], 'default': sliders[key].value}
+    temp.params = up
+    res = temp.run(verbose=False)
+
+    pm = getattr(temp, 'performance_metrics', {})
+    metrics_title.text = fmt_metrics(pm)
+
+    threshold_sources["tt_threshold"].data  = {'x': [dates.iloc[0], dates.iloc[-1]], 'y': [sliders['TT'].value]  * 2}
+    threshold_sources["fc_threshold"].data  = {'x': [dates.iloc[0], dates.iloc[-1]], 'y': [sliders['FC'].value]  * 2}
+    threshold_sources["uzl_threshold"].data = {'x': [dates.iloc[0], dates.iloc[-1]], 'y': [sliders['UZL'].value] * 2}
+
+    bf = res.get('baseflow',          np.zeros_like(res['discharge']))
+    mf = res.get('intermediate_flow', np.zeros_like(res['discharge']))
+    qf = res.get('quick_flow',        np.zeros_like(res['discharge']))
+
+    sources["flow"].data              = {'x': dates, 'y': res['discharge']}
+    sources["snow"].data              = {'x': dates, 'y': res['snowpack']}
+    sources["liquid_water"].data      = {'x': dates, 'y': res['liquid_water']}
+    sources["temperature"].data       = {'x': dates, 'y': res['temperature']}
+    sources["soil"].data              = {'x': dates, 'y': res['soil_moisture']}
+    sources["potential_et"].data      = {'x': dates, 'y': res['potential_et']}
+    sources["actual_et"].data         = {'x': dates, 'y': res['actual_et']}
+    sources["upper_storage"].data     = {'x': dates, 'y': res['upper_storage']}
+    sources["lower_storage"].data     = {'x': dates, 'y': res['lower_storage']}
+    sources["quick_flow"].data        = {'x': dates, 'y': qf}
+    sources["intermediate_flow"].data = {'x': dates, 'y': mf}
+    sources["baseflow"].data          = {'x': dates, 'y': bf}
+    sources["stacked_flows"].data     = {
+        'x': dates, 'baseflow': bf, 'intermediate': mf, 'quick': qf,
+        'baseflow_top': bf, 'intermediate_top': bf + mf, 'total': res['discharge'],
     }
 
 for s in sliders.values():
     s.on_change('value_throttled', update_plot)
 
-# ==== Calibration Button ====
-def calibrate():
-    for group_name, group_params in model.params.items():
-        for key, meta in group_params.items():
+
+def restore_calibrated():
+    for g in GROUP_ORDER:
+        for key, meta in params[g].items():
             if key in sliders:
                 sliders[key].value = meta['default']
     update_plot('value', None, None)
 
-# ==== Create Minimal Plots ====
-def create_plot(width=850, height=200, shared_x_range=None):
-    """Helper to create minimal styled plots"""
-    if shared_x_range is None:
-        p = figure(x_axis_type="datetime", width=width, height=height,
-                  tools="pan,wheel_zoom,box_zoom,reset,save",
-                  toolbar_location="above")
-    else:
-        p = figure(x_axis_type="datetime", width=width, height=height,
-                  tools="pan,wheel_zoom,box_zoom,reset,save",
-                  x_range=shared_x_range,
-                  toolbar_location="above")
-    
-    # Minimal styling
-    p.background_fill_color = "#ffffff"
-    p.border_fill_color = "#ffffff"
-    p.outline_line_color = "#e5e5e5"
-    p.outline_line_width = 1
-    p.grid.grid_line_color = "#f0f0f0"
-    p.grid.grid_line_alpha = 1
-    p.grid.grid_line_width = 1
-    
-    return p
 
-def create_tab(tab_name, shared_x_range=None):
-    """Create minimal tabs"""
-    top_plot = create_plot(shared_x_range=shared_x_range)
-    
-    if tab_name != "Flow Components":
-        bottom_plot = create_plot(shared_x_range=top_plot.x_range)
-    
-    if tab_name == "snow":
-        top_plot.title.text = "Temperature & Snow Threshold"
-        top_plot.line('x', 'y', source=sources["temperature"], line_width=2, 
-                     color="#ef4444", legend_label="Temperature", alpha=0.85)
-        top_plot.line('x', 'y', source=threshold_sources["tt_threshold"], 
-                     line_width=1.5, line_dash="dashed", color="#a1a1aa", 
-                     legend_label="TT Threshold", alpha=0.7)
-        top_plot.yaxis.axis_label = "Temperature (°C)"
-        top_plot.legend.location = "top_right"
-        top_plot.legend.background_fill_alpha = 0.9
-        top_plot.legend.border_line_color = "#e5e5e5"
-        
-        bottom_plot.title.text = "Snow Pack & Liquid Water"
-        bottom_plot.line('x', 'y', source=sources["snow"], line_width=2, 
-                        color="#3b82f6", legend_label="Snow Pack", alpha=0.85)
-        bottom_plot.line('x', 'y', source=sources["liquid_water"], line_width=2, 
-                        color="#93c5fd", legend_label="Liquid Water", alpha=0.85)
-        bottom_plot.yaxis.axis_label = "Water Equivalent (mm)"
-        bottom_plot.legend.location = "top_right"
-        bottom_plot.legend.background_fill_alpha = 0.9
-        bottom_plot.legend.border_line_color = "#e5e5e5"
-        
-        return TabPanel(child=column(top_plot, bottom_plot, spacing=12), 
-                       title="Snow"), top_plot.x_range
-        
-    elif tab_name == "soil":
-        top_plot.title.text = "Evapotranspiration"
-        top_plot.line('x', 'y', source=sources["potential_et"], line_width=2, 
-                     color="#f97316", legend_label="Potential ET", alpha=0.85)
-        top_plot.line('x', 'y', source=sources["actual_et"], line_width=2, 
-                     color="#22c55e", legend_label="Actual ET", alpha=0.85)
-        top_plot.yaxis.axis_label = "ET (mm/day)"
-        top_plot.legend.location = "top_right"
-        top_plot.legend.background_fill_alpha = 0.9
-        top_plot.legend.border_line_color = "#e5e5e5"
-        
-        bottom_plot.title.text = "Soil Moisture"
-        bottom_plot.line('x', 'y', source=sources["soil"], line_width=2, 
-                        color="#92400e", legend_label="Soil Moisture", alpha=0.85)
-        bottom_plot.line('x', 'y', source=threshold_sources["fc_threshold"], 
-                        line_width=1.5, line_dash="dashed", color="#a1a1aa", 
-                        legend_label="Field Capacity", alpha=0.7)
-        bottom_plot.yaxis.axis_label = "Soil Moisture (mm)"
-        bottom_plot.legend.location = "top_right"
-        bottom_plot.legend.background_fill_alpha = 0.9
-        bottom_plot.legend.border_line_color = "#e5e5e5"
-        
-        return TabPanel(child=column(top_plot, bottom_plot, spacing=12), 
-                       title="Soil"), top_plot.x_range
-        
-    elif tab_name == "Flow Components":
-        flow_plot = create_plot(height=420, shared_x_range=shared_x_range)
-        flow_plot.title.text = "Flow Component Breakdown"
-        
-        flow_plot.varea(x='x', y1=0, y2='baseflow_top', 
-                       source=sources["stacked_flows"], 
-                       fill_color="#3b82f6", fill_alpha=0.6,
-                       legend_label="Baseflow")
-        flow_plot.varea(x='x', y1='baseflow_top', y2='intermediate_top', 
-                       source=sources["stacked_flows"], 
-                       fill_color="#f97316", fill_alpha=0.6,
-                       legend_label="Intermediate")
-        flow_plot.varea(x='x', y1='intermediate_top', y2='total', 
-                       source=sources["stacked_flows"], 
-                       fill_color="#ef4444", fill_alpha=0.6,
-                       legend_label="Quick Flow")
-        flow_plot.line('x', 'total', source=sources["stacked_flows"], 
-                      line_width=1.5, color="#52525b", alpha=0.7,
-                      legend_label="Total")
-        
-        flow_plot.yaxis.axis_label = "Discharge (mm/day)"
-        flow_plot.legend.location = "top_right"
-        flow_plot.legend.background_fill_alpha = 0.9
-        flow_plot.legend.border_line_color = "#e5e5e5"
-        
-        return TabPanel(child=flow_plot, title="Flow"), top_plot.x_range
-        
-    else:  # response
-        top_plot.title.text = "Upper Zone Storage"
-        top_plot.line('x', 'y', source=sources["upper_storage"], line_width=2, 
-                     color="#a855f7", legend_label="Upper Storage", alpha=0.85)
-        top_plot.line('x', 'y', source=threshold_sources["uzl_threshold"], 
-                     line_width=1.5, line_dash="dashed", color="#a1a1aa", 
-                     legend_label="UZL Threshold", alpha=0.7)
-        top_plot.yaxis.axis_label = "Storage (mm)"
-        top_plot.legend.location = "top_right"
-        top_plot.legend.background_fill_alpha = 0.9
-        top_plot.legend.border_line_color = "#e5e5e5"
-        
-        bottom_plot.title.text = "Lower Zone Storage"
-        bottom_plot.line('x', 'y', source=sources["lower_storage"], line_width=2, 
-                        color="#14b8a6", legend_label="Lower Storage", alpha=0.85)
-        bottom_plot.yaxis.axis_label = "Storage (mm)"
-        bottom_plot.legend.location = "top_right"
-        bottom_plot.legend.background_fill_alpha = 0.9
-        bottom_plot.legend.border_line_color = "#e5e5e5"
-        
-        return TabPanel(child=column(top_plot, bottom_plot, spacing=12), 
-                       title="Response"), top_plot.x_range
+# ── Detail tabs ───────────────────────────────────────────────────────────────
+leg = dict(location="top_right", background_fill_alpha=0.9,
+           border_line_color="#e2e8f0", label_text_font_size="10px")
 
-# Create tabs
-first_tab, shared_x_range = create_tab("snow")
-second_tab, _ = create_tab("soil", shared_x_range)
-third_tab, _ = create_tab("response", shared_x_range)
-fourth_tab, _ = create_tab("Flow Components", shared_x_range)
+def build_tab(name, shared_x_range=None):
+    top = make_plot(shared_x_range=shared_x_range)
+    if name != "flow":
+        bot = make_plot(shared_x_range=top.x_range)
 
-tabs = Tabs(tabs=[first_tab, second_tab, third_tab, fourth_tab])
+    if name == "snow":
+        top.title.text = "Temperature & snow-threshold (TT)"
+        top.line('x', 'y', source=sources["temperature"],
+                 line_width=2, color="#ef4444", legend_label="Temperature", alpha=0.85)
+        top.line('x', 'y', source=threshold_sources["tt_threshold"],
+                 line_width=1.5, line_dash="dashed", color="#94a3b8",
+                 legend_label="TT threshold", alpha=0.8)
+        top.yaxis.axis_label = "Temperature (°C)"
+        top.legend.update(**leg)
 
-# ==== Main Hydrograph Plot ====
-main_flow_plot = create_plot(height=380, shared_x_range=shared_x_range)
-main_flow_plot.title.text = "Simulated vs Observed Discharge"
+        bot.title.text = "Snowpack & liquid water in snow"
+        bot.line('x', 'y', source=sources["snow"],
+                 line_width=2, color="#3b82f6", legend_label="Snowpack", alpha=0.85)
+        bot.line('x', 'y', source=sources["liquid_water"],
+                 line_width=2, color="#93c5fd", legend_label="Liquid water", alpha=0.85)
+        bot.yaxis.axis_label = "Water equivalent (mm)"
+        bot.legend.update(**leg)
+        return TabPanel(child=column(top, bot, spacing=10), title="Snow"), top.x_range
 
-main_flow_plot.line('x', 'y', source=sources["flow"], line_width=2.5, 
-                   color="#ef4444", legend_label="Simulated", alpha=0.85)
-main_flow_plot.line('x', 'y', source=sources["observed_flow"], line_width=2, 
-                   color="#3b82f6", legend_label="Observed", line_dash="dashed", alpha=0.75)
+    elif name == "soil":
+        top.title.text = "Potential vs actual evapotranspiration"
+        top.line('x', 'y', source=sources["potential_et"],
+                 line_width=2, color="#f97316", legend_label="Potential ET", alpha=0.85)
+        top.line('x', 'y', source=sources["actual_et"],
+                 line_width=2, color="#22c55e", legend_label="Actual ET", alpha=0.85)
+        top.yaxis.axis_label = "ET (mm/day)"
+        top.legend.update(**leg)
 
-main_flow_plot.yaxis.axis_label = "Discharge (mm/day)"
-main_flow_plot.legend.location = "top_left"
-main_flow_plot.legend.background_fill_alpha = 0.9
-main_flow_plot.legend.border_line_color = "#e5e5e5"
+        bot.title.text = "Soil moisture & field capacity (FC)"
+        bot.line('x', 'y', source=sources["soil"],
+                 line_width=2, color="#92400e", legend_label="Soil moisture", alpha=0.85)
+        bot.line('x', 'y', source=threshold_sources["fc_threshold"],
+                 line_width=1.5, line_dash="dashed", color="#94a3b8",
+                 legend_label="Field capacity (FC)", alpha=0.8)
+        bot.yaxis.axis_label = "Soil moisture (mm)"
+        bot.legend.update(**leg)
+        return TabPanel(child=column(top, bot, spacing=10), title="Soil"), top.x_range
 
-# ==== Minimal Layout ====
-title_div = Div(text="""
-    <div style='
-        color: #1f1f1f;
-        padding: 16px 20px;
-        margin: 0;
-        border-bottom: 1px solid #e5e5e5;
-        background: #ffffff;
-    '>
-        <h2 style='margin: 0; font-size: 15px; font-weight: 500; letter-spacing: 0.3px;'>
-            Model Parameters
-        </h2>
-    </div>
-""", width=320)
+    elif name == "response":
+        top.title.text = "Upper zone storage & quick-flow threshold (UZL)"
+        top.line('x', 'y', source=sources["upper_storage"],
+                 line_width=2, color="#a855f7", legend_label="Upper storage", alpha=0.85)
+        top.line('x', 'y', source=threshold_sources["uzl_threshold"],
+                 line_width=1.5, line_dash="dashed", color="#94a3b8",
+                 legend_label="UZL threshold", alpha=0.8)
+        top.yaxis.axis_label = "Storage (mm)"
+        top.legend.update(**leg)
 
-# Metrics display (minimal design)
-metrics_display = Div(text=f"""
-    <div style='
-        background: #f9f9f9;
-        padding: 10px 16px;
-        border-radius: 6px;
-        margin: 0 0 16px 0;
-        border: 1px solid #e5e5e5;
-    '>
-        <div style='font-size: 11px; color: #666; margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;'>
-            Performance Metrics
+        bot.title.text = "Lower zone storage (baseflow reservoir)"
+        bot.line('x', 'y', source=sources["lower_storage"],
+                 line_width=2, color="#14b8a6", legend_label="Lower storage", alpha=0.85)
+        bot.yaxis.axis_label = "Storage (mm)"
+        bot.legend.update(**leg)
+        return TabPanel(child=column(top, bot, spacing=10), title="Response"), top.x_range
+
+    else:  # flow components
+        p = make_plot(height=430, shared_x_range=shared_x_range)
+        p.title.text = "Runoff components (stacked)"
+        p.varea(x='x', y1=0,              y2='baseflow_top',     source=sources["stacked_flows"],
+                fill_color="#3b82f6", fill_alpha=0.55, legend_label="Baseflow")
+        p.varea(x='x', y1='baseflow_top', y2='intermediate_top', source=sources["stacked_flows"],
+                fill_color="#f97316", fill_alpha=0.55, legend_label="Intermediate")
+        p.varea(x='x', y1='intermediate_top', y2='total',        source=sources["stacked_flows"],
+                fill_color="#ef4444", fill_alpha=0.55, legend_label="Quick flow")
+        p.line('x', 'total', source=sources["stacked_flows"],
+               line_width=1.5, color="#334155", alpha=0.6, legend_label="Total")
+        p.yaxis.axis_label = "Discharge (mm/day)"
+        p.legend.update(**leg)
+        return TabPanel(child=p, title="Flow components"), top.x_range
+
+
+tab_snow,     shared_x = build_tab("snow")
+tab_soil,     _        = build_tab("soil",     shared_x)
+tab_response, _        = build_tab("response", shared_x)
+tab_flow,     _        = build_tab("flow",     shared_x)
+tabs = Tabs(tabs=[tab_snow, tab_soil, tab_response, tab_flow])
+
+# ── Main hydrograph ───────────────────────────────────────────────────────────
+main_plot = make_plot(height=420, shared_x_range=shared_x)
+main_plot.title.text  = "Simulated vs Observed Discharge"
+main_plot.title.align = "left"
+
+# Metrics as a right-aligned subtitle inside the figure
+initial_pm     = getattr(model, 'performance_metrics', {})
+metrics_title  = Title(
+    text           = fmt_metrics(initial_pm),
+    text_font_size = "11px",
+    text_color     = "#64748b",
+    text_font_style= "normal",
+    align          = "right",
+)
+main_plot.add_layout(metrics_title, 'above')
+
+# Precipitation — inverted bars, secondary right axis
+max_precip = float(np.nanmax(precip_vals)) if len(precip_vals) > 0 else 10.0
+main_plot.extra_y_ranges = {"precip": Range1d(start=max_precip * 3.5, end=0)}
+main_plot.add_layout(LinearAxis(
+    y_range_name="precip",
+    axis_label="Precipitation (mm)",
+    axis_label_text_color="#94a3b8",
+    major_label_text_color="#94a3b8",
+    axis_line_color="#e2e8f0",
+    major_tick_line_color="#e2e8f0",
+    minor_tick_line_color=None,
+), 'right')
+main_plot.vbar(
+    x='x', top='top', source=sources["precipitation"],
+    width=86400000 * 0.8, y_range_name="precip",
+    fill_color="#bfdbfe", line_color=None, alpha=0.5,
+    legend_label="Precipitation",
+)
+
+# Observed — solid, prominent dark blue
+main_plot.line('x', 'y', source=sources["observed_flow"],
+               line_width=3, color="#1d4ed8",
+               legend_label="Observed", alpha=0.9)
+
+# Simulated — solid red, slightly thinner so observed reads first
+main_plot.line('x', 'y', source=sources["flow"],
+               line_width=2, color="#ef4444",
+               legend_label="Simulated", alpha=0.85)
+
+main_plot.yaxis.axis_label             = "Discharge (mm/day)"
+main_plot.legend.location              = "top_left"
+main_plot.legend.background_fill_alpha = 0.9
+main_plot.legend.border_line_color     = "#e2e8f0"
+main_plot.legend.label_text_font_size  = "10px"
+
+# ── Left panel ────────────────────────────────────────────────────────────────
+# Heights: right panel ≈ header(68) + toggle-row(38) + tabs(460) + gap(8) + main_plot(420) = ~994px
+# Left panel: header(58) + scrollable(880) + button(54) ≈ 992px
+SCROLL_H   = 880
+TOP_SPACER = 320   # blank space above and below the sliders
+
+sidebar_header = Div(
+    text="""
+    <div style='color:#1e293b; padding:14px 20px 10px; margin:0;
+                border-bottom:1px solid #e2e8f0; background:#ffffff;'>
+        <div style='font-size:13px; font-weight:600;'>Parameters</div>
+        <div style='font-size:11px; color:#94a3b8; margin-top:2px;'>
+            Updates on slider release
         </div>
-        <div style='font-size: 13px; color: #1f1f1f; font-weight: 400; font-family: monospace;'>
-            {metrics_text}
-        </div>
-    </div>
-""", width=850)
+    </div>""",
+    width=304,
+)
 
-scrollable_content = column(
-    *slider_groups_with_spacers,
-    width=310,
-    height=725,
+scrollable = column(
+    Div(text="<div style='height:80px'></div>", width=264),
+    *slider_groups,
+    Div(text=f"<div style='height:{TOP_SPACER * 2}px'></div>", width=264),
+    width=294, height=SCROLL_H,
     sizing_mode="inherit",
     styles={
         'overflow-y': 'scroll',
@@ -422,118 +338,121 @@ scrollable_content = column(
         'background': '#ffffff',
     },
     stylesheets=["""
-        :host {
-            scrollbar-width: thin;
-            scrollbar-color: #d4d4d8 #fafafa;
-        }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { 
-            background: #fafafa; 
-        }
-        ::-webkit-scrollbar-thumb { 
-            background: #d4d4d8; 
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+        :host { scrollbar-width: thin; scrollbar-color: #cbd5e1 #f8fafc; }
+        ::-webkit-scrollbar       { width: 5px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .bk-panel-models-column-Column { direction: ltr; }
-    """]
+    """],
 )
 
-calibrate_button = Button(
-    label="Restore Calibrated Values", 
-    button_type="light",
-    width=280,
-    height=36,
+restore_btn = Button(
+    label="↺  Restore calibrated values",
+    button_type="primary",
+    width=264, height=36,
     styles={
-        'margin': '12px 20px',
-        'font-size': '13px',
-        'font-weight': '400',
-    }
+        'margin': '10px 20px',
+        'font-size': '12px',
+        'font-weight': '500',
+        'letter-spacing': '0.2px',
+    },
 )
-calibrate_button.on_click(calibrate)
+restore_btn.on_click(restore_calibrated)
 
-parameters_panel = column(
-    title_div,
-    scrollable_content,
-    calibrate_button,
-    width=320,
-    sizing_mode="fixed",
+from bokeh.models import CustomJS
+
+# ── Scroll-to-middle on page load ─────────────────────────────────────────────
+# Attach to sources["flow"] — its data is set by the server on every page load
+# AND on every slider update, so js_on_change fires reliably.
+# window._scrollInit guards against re-running after the first time.
+SCROLL_INIT_CODE = """
+if (window._scrollInit) return;
+window._scrollInit = true;
+
+function initScroll() {
+    var all = Array.from(document.querySelectorAll('*'));
+    for (var i = 0; i < all.length; i++) {
+        var el = all[i];
+        try {
+            if (Math.abs(el.clientHeight - SCROLL_H) < 10 &&
+                el.scrollHeight > el.clientHeight + 80) {
+                el.scrollTop = TOP_SPACER;
+                return true;
+            }
+        } catch(e) {}
+    }
+    return false;
+}
+
+var attempt = 0;
+(function retry() {
+    if (!initScroll() && attempt++ < 20) setTimeout(retry, 200);
+})();
+""".replace("SCROLL_H", str(SCROLL_H)).replace("TOP_SPACER", str(TOP_SPACER))
+
+sources["flow"].js_on_change('data', CustomJS(code=SCROLL_INIT_CODE))
+
+left_panel = column(
+    sidebar_header, scrollable, restore_btn,
+    width=304, sizing_mode="fixed",
     styles={
         'margin-right': '20px',
         'background': '#ffffff',
-        'border': '1px solid #e5e5e5',
+        'border': '1px solid #e2e8f0',
         'border-radius': '8px',
-    }
+    },
 )
 
-# Minimal toggle button
-processes_toggle = Toggle(
-    label="Hide Details", 
-    button_type="light",
-    width=100,
-    height=32,
-    active=True,
-    styles={
-        'font-size': '13px',
-        'font-weight': '400',
-        'margin-bottom': '16px',
-    }
+# ── Right panel ───────────────────────────────────────────────────────────────
+app_header = Div(
+    text="""
+    <div style='margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid #e2e8f0;'>
+        <div style='font-size:16px; font-weight:600; color:#0f172a; margin-bottom:3px;'>
+            HBV Model Playground
+        </div>
+        <div style='font-size:12px; color:#64748b;'>
+            Ramundberget catchment, Sweden &nbsp;·&nbsp; 2015–2020 &nbsp;·&nbsp;
+            14 calibratable parameters
+        </div>
+    </div>""",
+    width=860,
 )
 
-processes_header = Div(text="""
-    <div style='
-        color: #1f1f1f;
-        padding: 0;
-        margin: 0 0 16px 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    '>
-        <h2 style='margin: 0; font-size: 15px; font-weight: 500; letter-spacing: 0.3px;'>
-            Model Outputs
-        </h2>
-    </div>
-""", width=750)
-
-# Collapsible content container
-collapsible_content = column(
-    tabs,
-    spacing=0,
-    visible=True,
-    name="collapsible_section"
+details_toggle = Toggle(
+    label="Hide details", button_type="light",
+    width=100, height=30, active=True,
+    styles={'font-size': '12px'},
 )
+details_label = Div(
+    text="<div style='font-size:13px; font-weight:600; color:#1e293b; padding-top:4px;'>Model internals</div>",
+    width=740,
+)
+detail_section = column(tabs, spacing=0, visible=True)
 
-# Toggle callback
-def toggle_callback(attr, old, new):
-    collapsible_content.visible = new
-    if new:
-        processes_toggle.label = "Hide Details"
-    else:
-        processes_toggle.label = "Show Details"
 
-processes_toggle.on_change('active', toggle_callback)
+def on_toggle(attr, old, new):
+    detail_section.visible = new
+    details_toggle.label   = "Hide details" if new else "Show details"
 
-# Header row with toggle
-header_row = row(processes_header, processes_toggle, spacing=10)
+details_toggle.on_change('active', on_toggle)
 
 right_panel = column(
-    header_row,
-    collapsible_content,
-    metrics_display,
-    main_flow_plot,
+    app_header,
+    row(details_label, details_toggle, spacing=10),
+    detail_section,
+    Div(text="<div style='height:8px'></div>", width=860),
+    main_plot,
     sizing_mode="fixed",
-    styles={'margin-left': '0px'}
 )
 
+# ── Root ──────────────────────────────────────────────────────────────────────
 layout = row(
-    parameters_panel, 
-    right_panel,
+    left_panel, right_panel,
     sizing_mode="fixed",
-    styles={
-        'padding': '24px',
-        'background': '#fafafa',
-    }
+    styles={'padding': '24px', 'background': '#f8fafc'},
 )
 
 curdoc().add_root(layout)
-curdoc().title = "HBV Model Dashboard"
+curdoc().title = "HBV Model Playground"
+
