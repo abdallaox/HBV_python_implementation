@@ -141,6 +141,81 @@ Build intuition for how each parameter shapes the hydrograph in the interactive
 [**HBVLAB playground**](https://hbvpythonimplementation-production.up.railway.app/HBV_playground),
 which runs a model built with this library.
 
+### Use it as an MCP server (for AI agents)
+
+`HBV_Lab` ships an [MCP](https://modelcontextprotocol.io/) server so **any** AI agent can build, run,
+calibrate and analyse HBV models through tool calls. It runs in two modes:
+
+- **stdio** (default) — the agent launches the server as a local subprocess. Best for desktop agents.
+- **HTTP** (`--http`) — the server runs as a standalone service at `http://<host>:<port>/mcp` that any
+  number of remote agents can connect to.
+
+Install once:
+
+```bash
+pip install "HBV_Lab[mcp]"
+```
+
+#### Option A — local (stdio)
+
+No need to start anything yourself; the agent runs `hbv-mcp` for you. Just add it to your client's
+MCP config.
+
+**Claude Desktop** — edit `claude_desktop_config.json` (Settings → Developer → Edit Config):
+
+```json
+{
+  "mcpServers": {
+    "hbv-lab": { "command": "hbv-mcp" }
+  }
+}
+```
+
+**Claude Code** — one command:
+
+```bash
+claude mcp add hbv-lab hbv-mcp
+```
+
+**Any other MCP client** — point it at the command `hbv-mcp` (transport: stdio).
+
+#### Option B — shared HTTP server (any agent, local or remote)
+
+Start the server once:
+
+```bash
+hbv-mcp --http                       # http://127.0.0.1:8000/mcp  (this machine only)
+hbv-mcp --http --host 0.0.0.0 --port 9000   # expose on the network
+```
+
+Then connect your agent to the URL:
+
+```bash
+# Claude Code
+claude mcp add --transport http hbv-lab http://127.0.0.1:8000/mcp
+```
+
+```json
+// Claude Desktop / generic client config
+{
+  "mcpServers": {
+    "hbv-lab": { "type": "http", "url": "http://127.0.0.1:8000/mcp" }
+  }
+}
+```
+
+Host/port also read the `PORT` / `HBV_MCP_HOST` / `HBV_MCP_PORT` environment variables, so the HTTP
+mode deploys cleanly to platforms like Railway, Render or Fly.
+
+#### What the agent can do
+
+Tools: `create_model`, `load_data` (from a CSV/Excel file path), `get_parameters`, `set_parameters`,
+`set_initial_conditions`, `run_model`, `calibrate`, `evaluate_uncertainty`, `plot_results`,
+`save_results`, `save_model`, `load_model`, `list_models`. A typical agent flow is *create → load →
+run → calibrate → plot*. Model state is kept server-side (each tool takes a `model_id`) and large time
+series are passed by **file path**, not through the agent's context — tools return compact metrics and
+output-file paths.
+
 ## Inputs & outputs
 
 **Inputs** (daily, consistent units): precipitation (mm), air temperature (°C) and potential

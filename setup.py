@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name='HBV_Lab',
-    version='1.1.1',
+    version='1.2.0',
     packages=find_packages(include=['HBV_Lab', 'HBV_Lab.*']),
     install_requires=[
         'numpy',
@@ -18,6 +18,13 @@ setup(
     extras_require={
         # Optional dependencies for the interactive Bokeh playground
         'playground': ['bokeh>=2.4.0'],
+        # Optional dependencies for the MCP server (expose the model to agents)
+        'mcp': ['mcp>=1.0.0'],
+    },
+    entry_points={
+        'console_scripts': [
+            'hbv-mcp = HBV_Lab.mcp_server:main',
+        ],
     },
     author='Abdalla Mohammed',
     author_email='abdalla.mohammed.ox@gmail.com',
