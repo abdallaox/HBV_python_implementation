@@ -3,7 +3,7 @@ import numpy as np
 import os
 import tempfile
 import pytest
-from HBV_model import HBVModel
+from HBV_Lab import HBVModel
 
 
 def make_sample_df(n_days=10):

@@ -1,4 +1,4 @@
-from hbv_step import hbv_step
+from HBV_Lab import hbv_step
 
 
 def test_hbv_step_returns_expected_keys():

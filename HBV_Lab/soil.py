@@ -9,8 +9,7 @@ def soil_routine(runoff_from_snow, temperature, potential_et, soil_moisture, par
     Parameters:
     -----------
     runoff_from_snow : float
-        Incoming liquid wls
-        ater from snow routine (mm/day).
+        Incoming liquid water from the snow routine (mm/day).
     temperature : float
         Daily average temperature (°C). (Currently unused but kept for possible extensions).
     potential_et : float
@@ -27,12 +26,14 @@ def soil_routine(runoff_from_snow, temperature, potential_et, soil_moisture, par
     --------
     soil_moisture : float
         Updated soil moisture storage (mm).
+    out_to_response : float
+        Total water passed to the response routine (recharge + surface runoff) (mm/day).
     recharge : float
         Water recharging to the groundwater (mm/day).
-    actual_et : float
-        Actual evapotranspiration (mm/day).
     runoff : float
         Surface runoff due to soil overflow (mm/day).
+    actual_et : float
+        Actual evapotranspiration (mm/day).
     """
 
     FC = params['FC']     ['default']   # Maximum soil moisture capacity

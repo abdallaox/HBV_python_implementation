@@ -1,4 +1,4 @@
-from snow import snow_routine
+from HBV_Lab import snow_routine
 
 
 def test_snow_accumulates_and_runs_off():

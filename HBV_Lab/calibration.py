@@ -1,17 +1,22 @@
 class calibration:
 
-    def calibrate(self, method='SLSQP', objective='NSE', iterations=100, 
+    def calibrate(self, method='Nelder-Mead', objective='NSE', iterations=100,
                             verbose=True, plot_results=True):
         """
         Calibrate an HBV model's parameters to optimize the objective function.
-        
+
         Parameters:
         -----------
         self : HBVmodel
             The HBV model instance to calibrate
-        method : str, default 'SLSQP'
+        method : str, default 'Nelder-Mead'
             Optimization method to use (see scipy.optimize.minimize).
-            Options include 'SLSQP', 'L-BFGS-B', 'Nelder-Mead', etc.
+            A gradient-free method is used by default because the HBV objective
+            surface is piecewise-constant (many min/max thresholds), which makes
+            finite-difference gradients ~0 and causes gradient-based methods such
+            as 'SLSQP' or 'L-BFGS-B' to terminate immediately without improving
+            on the starting values. Gradient-free options that respect the
+            parameter bounds include 'Nelder-Mead' and 'Powell'.
         objective : str, default 'NSE'
             Objective function to maximize. Options are:
             - 'NSE': Nash-Sutcliffe Efficiency (higher is better)
@@ -103,13 +108,13 @@ class calibration:
             self.params = param_dict
             
             
-            # Run the model
-            self.run(verbose)
-            
-            # Get simulated discharge and valid observed discharge
-            sim_q = self.results['discharge'][valid_idx]
-            obs_q_valid = obs_q[valid_idx]
-            self.calculate_performance_metrics
+            # Run the model (run() computes performance metrics internally when
+            # observed discharge is available, honouring the warmup period)
+            self.run(verbose=False)
+
+            # Ensure performance metrics reflect the current parameter set
+            self.calculate_performance_metrics(verbose=False)
+
             # Calculate objective function value
             if objective == 'NSE':
                 # Nash-Sutcliffe Efficiency (to be maximized)

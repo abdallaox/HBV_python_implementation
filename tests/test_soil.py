@@ -1,5 +1,5 @@
 import pytest
-from soil import soil_routine
+from HBV_Lab import soil_routine
 
 
 def test_soil_et_and_recharge():

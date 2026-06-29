@@ -6,7 +6,7 @@ from bokeh.models import (
 from bokeh.plotting import figure
 from bokeh.io import curdoc
 import numpy as np
-from HBV_model import HBVModel
+from HBV_Lab import HBVModel
 
 # ── Load pre-calibrated model ─────────────────────────────────────────────────
 model = HBVModel.load_model('./models/model_calibrated')

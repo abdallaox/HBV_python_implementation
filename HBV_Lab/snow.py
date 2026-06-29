@@ -13,8 +13,6 @@ def snow_routine(precipitation, temperature, snowpack, liquid_water, params):
             - CFR (float): Refreezing factor (-).
             - CWH (float): Water holding capacity of snowpack (-, e.g., 0.1).
             - SFCF (float): Snowfall correction factor (-).
-            - PCF (float): Precipitation correction factor——to account for bias in precipitation  (-).
-
 
     Returns:
         new_snowpack (float): Updated snowpack (mm).
@@ -27,11 +25,6 @@ def snow_routine(precipitation, temperature, snowpack, liquid_water, params):
     CFR = params['CFR']['default']
     CWH = params['CWH']['default']
     SFCF = params['SFCF']['default']
-    #PCF = params['PCF']['default']
-    
-    # Give the model a room to account for any biases in the estimation of precipitation
-
-    precipitation= precipitation 
 
     # Initialize snowfall and rainfall
     snowfall = 0.0

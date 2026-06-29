@@ -6,7 +6,7 @@ HBV-like hydrological model. It handles parameter management, data reading, mode
 execution, and output visualization.
 
 Usage:
-    from hbv_model import HBVModel
+    from HBV_Lab import HBVModel
     model = HBVModel()
     model.load_data("path/to/data.csv")
     model.set_parameters(params)
@@ -22,12 +22,10 @@ from matplotlib.dates import DateFormatter
 import os
 import datetime
 from types import MethodType
-from uncertainty import uncertainty
-from calibration import calibration
-## from calibration import calibrate_hbv_model
-##  from uncertainty import evaluate_uncertainty
-from hbv_step import hbv_step
-from routing import route_with_maxbas
+from .uncertainty import uncertainty
+from .calibration import calibration
+from .hbv_step import hbv_step
+from .routing import route_with_maxbas
 
 class HBVModel(uncertainty, calibration):
     """
@@ -424,25 +422,42 @@ class HBVModel(uncertainty, calibration):
         sim_q_valid = sim_q[valid_idx]
         obs_q_valid = obs_q[valid_idx]
         
-        # Calculate Nash-Sutcliffe Efficiency (NSE)
+        # Calculate Nash-Sutcliffe Efficiency (NSE).
+        # NSE is undefined when the observations have zero variance (constant
+        # series); guard the division so we return NaN instead of raising a
+        # RuntimeWarning / producing +/-inf.
         mean_obs = np.mean(obs_q_valid)
         nse_numerator = np.sum((obs_q_valid - sim_q_valid) ** 2)
         nse_denominator = np.sum((obs_q_valid - mean_obs) ** 2)
-        nse = 1 - (nse_numerator / nse_denominator)
-        
-        # Calculate Kling-Gupta Efficiency (KGE)
+        nse = 1 - (nse_numerator / nse_denominator) if nse_denominator > 0 else np.nan
+
+        # Calculate Kling-Gupta Efficiency (KGE).
+        # This uses the modified KGE' (Kling et al., 2012) in which the
+        # variability ratio is based on the coefficient of variation
+        # (CV_sim / CV_obs) rather than the plain standard-deviation ratio.
         mean_sim = np.mean(sim_q_valid)
         std_obs = np.std(obs_q_valid)
         std_sim = np.std(sim_q_valid)
-        
-        r = np.corrcoef(obs_q_valid, sim_q_valid)[0, 1]  # Correlation coefficient
-        alpha = (std_sim/mean_sim) / (std_obs/mean_obs)  # Relative variability
-        beta = mean_sim / mean_obs  # Bias
-        
-        kge = 1 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2)
-        
-        # Calculate percent bias
-        pbias = 100 * (np.sum(sim_q_valid - obs_q_valid) / np.sum(obs_q_valid))
+
+        # Correlation is undefined if either series is constant.
+        if std_obs == 0 or std_sim == 0:
+            r = np.nan
+        else:
+            r = np.corrcoef(obs_q_valid, sim_q_valid)[0, 1]
+
+        if mean_obs == 0 or mean_sim == 0 or std_obs == 0:
+            # KGE components cannot be formed (division by zero); flag as NaN.
+            alpha = np.nan
+            beta = np.nan
+            kge = np.nan
+        else:
+            alpha = (std_sim / mean_sim) / (std_obs / mean_obs)  # variability ratio
+            beta = mean_sim / mean_obs                           # bias ratio
+            kge = 1 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2)
+
+        # Calculate percent bias (undefined if observations sum to zero).
+        sum_obs = np.sum(obs_q_valid)
+        pbias = 100 * (np.sum(sim_q_valid - obs_q_valid) / sum_obs) if sum_obs != 0 else np.nan
         
         # Calculate RMSE and MAE
         rmse = np.sqrt(np.mean((sim_q_valid - obs_q_valid) ** 2))
@@ -766,23 +781,27 @@ class HBVModel(uncertainty, calibration):
         
         return None
 
+    @staticmethod
     def load_model(model_path):
-
         """
         Load a saved HBV model from a file.
-        
+
+        Can be called either on the class or on an instance::
+
+            model = HBVModel.load_model("path/to/model")
+
         Parameters:
         -----------
         model_path : str
             Path to the saved model file.
-            
+
         Returns:
         --------
         HBVModel
             The loaded model instance.
         """
         import pickle
-        
+
         with open(model_path, 'rb') as f:
             model = pickle.load(f)
         

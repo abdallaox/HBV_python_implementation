@@ -1,4 +1,4 @@
-from response import response_routine_two_tanks
+from HBV_Lab import response_routine_two_tanks
 
 
 def test_response_basic_mass_balance():

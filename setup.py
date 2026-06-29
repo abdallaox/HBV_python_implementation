@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name='HBV_Lab',
-    version='1.0.0',
+    version='1.1.0',
     packages=find_packages(include=['HBV_Lab', 'HBV_Lab.*']),
     install_requires=[
         'numpy',
@@ -13,7 +13,12 @@ setup(
         'matplotlib',
         'scipy',
         'tqdm',
+        'openpyxl',  # required by pandas to read the .xlsx example data
     ],
+    extras_require={
+        # Optional dependencies for the interactive Bokeh playground
+        'playground': ['bokeh>=2.4.0'],
+    },
     author='Abdalla Mohammed',
     author_email='abdalla.mohammed.ox@gmail.com',
     description='An intuitive, object-oriented and user-friendly Python implementation of a lumped conceptual HBV hydrological model for educational and research purposes.',

@@ -4,14 +4,29 @@ HBV is a simple conceptual hydrological model that simulates the main hydrologic
 
 I've been experimenting with the model lately and—in an endeavour to better understand the logic behind it—I decided to implement my own version—in Python, following an intuitive object-oriented programming approach.
 
-This versioin implements the snow, soil, response and routing routines—controled by 14 calibratable parameters as shown below—In addition to calibration and uncertainty analysis modules. See the [documentation for one step of the model.](https://lucid.app/publicSegments/view/a0edb3b6-8eba-4db5-9984-bfd23cc004ef/image.png)
+This version implements the snow, soil, response and routing routines—controlled by 14 calibratable parameters as shown below—in addition to calibration and uncertainty analysis modules. See the [documentation for one step of the model.](https://lucid.app/publicSegments/view/a0edb3b6-8eba-4db5-9984-bfd23cc004ef/image.png)
+
+Conceptually the parameters belong to four routines:
+
 ```python
-parameters   = {
-                  'snow':        ['TT', 'CFMAX', 'SFCF', 'CFR', 'CWH'],
-                  'soil':        ['FC', 'LP', 'BETA'],
-                  'response':    ['K0', 'K1', 'K2', 'UZL', 'PERC']
-                  'routing' :    [ 'MAXBAS'],
-               }
+parameters = {
+    'snow':     ['TT', 'CFMAX', 'SFCF', 'CFR', 'CWH'],
+    'soil':     ['FC', 'LP', 'BETA'],
+    'response': ['K0', 'K1', 'K2', 'UZL', 'PERC'],
+    'routing':  ['MAXBAS'],
+}
+```
+
+In the model object the parameters are stored in three groups—`snow`, `soil`, and
+`response`—and the routing parameter `MAXBAS` lives inside the `response` group.
+Each parameter is a dict with `min` / `max` / `default` values, so a custom update
+passed to `set_parameters` looks like:
+
+```python
+model.set_parameters({
+    'soil':     {'FC': {'min': 50, 'max': 500, 'default': 250}},
+    'response': {'MAXBAS': {'default': 4}},
+})
 ```
 
 
@@ -20,24 +35,51 @@ This can be flexibly used for different modelling tasks, but can also be used in
 ## Get Started
 
 ### Install the Package
-```python 
-pip install HBV_Lab       or
-! pip install HBV_Lab
+From PyPI:
+```bash
+pip install HBV_Lab
 ```
+Or, inside a notebook:
+```python
+!pip install HBV_Lab
+```
+To work from the source / latest version:
+```bash
+git clone https://github.com/abdallaox/HBV_python_implementation.git
+cd HBV_python_implementation
+pip install -e .
+```
+
 ### How to Use
 It is very intuitive—you create a model like an object which has attributes (data, parameters, initial conditions, etc.) that you can assign and access. The object also performs functions (calibration, uncertainty estimation, save, load, etc.)
 ```python
+import pandas as pd
 from HBV_Lab import HBVModel
+
+# 1. Load forcing data (a DataFrame with date, precipitation, temperature,
+#    potential ET and—optionally—observed discharge columns)
+df = pd.read_excel("data/test_data_2.xlsx")
 model = HBVModel()
-model.load_data("pandas dataframe")
-model.set_parameters(params)
+model.load_data(
+    data=df,
+    date_column="Date", precip_column="P", temp_column="T",
+    pet_column="PET", obs_q_column="Q",
+    date_format="%Y%m%d", warmup_end="19811231",
+)
+
+# 2. (Optional) override default parameter ranges/values
+# model.set_parameters({'soil': {'FC': {'default': 250}}})
+
+# 3. Run, calibrate and analyse
 model.run()
-model.calibrate()
-model.evaluate_uncertainity()
+model.calibrate()              # gradient-free optimisation by default
+model.evaluate_uncertainty()   # Monte-Carlo uncertainty analysis
 model.plot_results()
-model.save_results()
-model.save_model("path")
-model.load_model("path")
+
+# 4. Persist results and the model itself
+model.save_results("results/run.csv")
+model.save_model("models/my_model")
+model = HBVModel.load_model("models/my_model")
 ```
 ### Tutorial
 Start by following a simple case study in the notebook:  [**quick_start_guide.ipynb**](https://github.com/abdallaox/HBV_python_implementation/blob/main/quick_start_guide.ipynb)
