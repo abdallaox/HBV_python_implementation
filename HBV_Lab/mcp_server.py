@@ -27,7 +27,7 @@ import matplotlib
 
 matplotlib.use("Agg")  # headless: no GUI needed on a server
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 
 from . import HBVModel, __version__
 
@@ -66,6 +66,20 @@ def _find_group(model: HBVModel, name: str) -> str | None:
         if name in params:
             return group
     return None
+
+
+def _downsample(seq, n: int = 20) -> list:
+    """At most ``n`` evenly-spaced rounded points from ``seq`` (keeps first and last).
+
+    Keeps the calibration trajectory compact in the tool result regardless of how many
+    iterations ran.
+    """
+    seq = [round(float(v), 4) for v in seq]
+    if len(seq) <= n:
+        return seq
+    step = (len(seq) - 1) / (n - 1)
+    idx = sorted({int(round(k * step)) for k in range(n)})
+    return [seq[i] for i in idx]
 
 
 # --- tools --------------------------------------------------------------------
@@ -210,35 +224,87 @@ def run_model(model_id: str) -> dict:
 
 
 @mcp.tool()
-def calibrate(
+async def calibrate(
     model_id: str,
     objective: str = "NSE",
     method: str = "Nelder-Mead",
     iterations: int = 1000,
+    ctx: Context = None,
 ) -> dict:
     """Calibrate the model to observed discharge (requires obs data loaded).
 
     ``objective`` is one of NSE / KGE / RMSE / MAE. ``method`` defaults to the
     gradient-free 'Nelder-Mead' (recommended for HBV's piecewise objective).
-    Returns the optimized parameters and final performance metrics.
+
+    Progress: while running, the server emits MCP progress notifications each
+    optimizer iteration (visible in clients that surface them).
+
+    Incremental use: each call continues from the model's *current* parameters, so an
+    agent can call calibrate repeatedly with a small ``iterations`` budget (e.g. 50),
+    inspect the improving metric and ``objective_trajectory`` between calls, and decide
+    whether to keep going, widen parameter ranges, or switch objective.
+
+    Returns the optimized parameters, final metrics, optimizer status, and the
+    best-objective-per-iteration trajectory (downsampled).
     """
+    import asyncio
+
     model = _get(model_id)
-    model.calibrate(
-        method=method,
-        objective=objective,
-        iterations=iterations,
-        verbose=False,
-        plot_results=False,
+    loop = asyncio.get_running_loop()
+    updates: asyncio.Queue = asyncio.Queue()
+
+    def progress_cb(i, total, current, best):
+        # Runs in the worker thread — hand the update back to the event loop safely.
+        loop.call_soon_threadsafe(updates.put_nowait, (i, total, current, best))
+
+    async def report(i, total, current, best):
+        if ctx is None:
+            return
+        try:
+            await ctx.report_progress(i, total)
+            await ctx.info(
+                f"calibrate iter {i}/{total}: {objective}={current:.4f} (best {best:.4f})"
+            )
+        except Exception:
+            pass
+
+    # Run the (blocking) calibration in a worker thread so we can stream progress.
+    task = asyncio.create_task(
+        asyncio.to_thread(
+            model.calibrate,
+            method=method,
+            objective=objective,
+            iterations=iterations,
+            verbose=False,
+            plot_results=False,
+            progress_callback=progress_cb,
+        )
     )
+    while not task.done():
+        try:
+            i, total, current, best = await asyncio.wait_for(updates.get(), timeout=0.25)
+            await report(i, total, current, best)
+        except asyncio.TimeoutError:
+            pass
+    while not updates.empty():  # flush any stragglers
+        await report(*updates.get_nowait())
+    out = await task  # re-raises any error from the worker thread
+
+    result = out["optimization_result"]
+    traj = out.get("trajectory", [])
     return {
         "model_id": model_id,
         "objective": objective,
         "method": method,
+        "n_iterations": int(getattr(result, "nit", len(traj))),
+        "success": bool(getattr(result, "success", True)),
+        "message": str(getattr(result, "message", "")),
         "optimized_parameters": {
             group: {name: round(info["default"], 6) for name, info in params.items()}
             for group, params in model.params.items()
         },
         "performance_metrics": _metrics(model),
+        "objective_trajectory": _downsample(traj, 20),
     }
 
 

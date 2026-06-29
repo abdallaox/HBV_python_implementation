@@ -216,6 +216,13 @@ run → calibrate → plot*. Model state is kept server-side (each tool takes a 
 series are passed by **file path**, not through the agent's context — tools return compact metrics and
 output-file paths.
 
+**Calibration progress & agent steering.** `calibrate` emits MCP progress notifications every
+optimizer iteration (clients that surface them show a live progress/log view), and its result
+includes the optimizer status and the best-objective-per-iteration `objective_trajectory`. Because
+each call continues from the model's *current* parameters, an agent can also calibrate incrementally
+— call `calibrate` with a small `iterations` budget, inspect the improving metric, and decide whether
+to keep going, widen ranges, or switch objective between rounds.
+
 ## Inputs & outputs
 
 **Inputs** (daily, consistent units): precipitation (mm), air temperature (°C) and potential

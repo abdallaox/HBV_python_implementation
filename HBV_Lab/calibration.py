@@ -1,7 +1,7 @@
 class calibration:
 
     def calibrate(self, method='Nelder-Mead', objective='NSE', iterations=100,
-                            verbose=True, plot_results=True):
+                            verbose=True, plot_results=True, progress_callback=None):
         """
         Calibrate an HBV model's parameters to optimize the objective function.
 
@@ -29,11 +29,19 @@ class calibration:
             Whether to print progress information
         plot_results : bool, default True
             Whether to plot the final results after calibration
-            
+        progress_callback : callable, optional
+            Called once per optimizer iteration as
+            ``progress_callback(iteration, total_iterations, current_value, best_value)``,
+            where the values are in human-facing objective terms (e.g. NSE). Useful for
+            driving an external progress UI (e.g. the MCP server). Exceptions raised by
+            the callback are swallowed so they cannot interrupt calibration.
+
         Returns:
         --------
         dict
-            Dictionary containing optimized parameters and performance metrics
+            Dictionary with keys ``parameters`` (optimized parameter dict),
+            ``performance`` (final metrics), ``optimization_result`` (the SciPy result),
+            and ``trajectory`` (best objective value per iteration).
         """
         import scipy.optimize as opt
         import numpy as np
@@ -154,15 +162,21 @@ class calibration:
             else:
                 raise ValueError(f"Unknown objective function: {objective}")
         
-        # Callback function to track progress
+        # Callback function to track progress.
+        # objective_function always returns a value to be MINIMIZED (for NSE/KGE it
+        # returns the negative metric), so the best-so-far starts at +inf for every
+        # objective and improves downward.
         num_iter = [0]
-        best_value = [float('inf') if objective in ['RMSE', 'MAE'] else float('-inf')]
+        best_value = [float('inf')]
         start_time = time.time()
-        
+        # Per-iteration best-so-far objective values, in human-facing terms
+        # (e.g. NSE/KGE as-is, RMSE/MAE as-is). Returned to the caller.
+        trajectory = []
+
         def callback(params):
             num_iter[0] += 1
             current_value = objective_function(params)
-            
+
             # For NSE and KGE, we're minimizing the negative value
             if objective in ['NSE', 'KGE']:
                 display_value = -current_value
@@ -170,10 +184,22 @@ class calibration:
             else:
                 display_value = current_value
                 is_better = current_value < best_value[0]
-            
+
             if is_better:
                 best_value[0] = current_value
-            
+
+            # Best objective so far, in human-facing terms
+            best_display = -best_value[0] if objective in ['NSE', 'KGE'] else best_value[0]
+            trajectory.append(best_display)
+
+            # Optional external progress hook (e.g. for an MCP/agent UI).
+            # Kept defensive: a misbehaving callback must not break calibration.
+            if progress_callback is not None:
+                try:
+                    progress_callback(num_iter[0], iterations, display_value, best_display)
+                except Exception:
+                    pass
+
             if verbose and num_iter[0] % max(1, iterations // 10) == 0:
                 elapsed = time.time() - start_time
                 print(f"Iteration {num_iter[0]}/{iterations}, "
@@ -238,7 +264,8 @@ class calibration:
             return {
                 'parameters': optimized_params,
                 'performance': self.performance_metrics,
-                'optimization_result': result
+                'optimization_result': result,
+                'trajectory': trajectory
             }
             
         except Exception as e:
