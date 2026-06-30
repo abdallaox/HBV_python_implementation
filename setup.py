@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name='HBV_Lab',
-    version='1.4.0',
+    version='1.4.1',
     packages=find_packages(include=['HBV_Lab', 'HBV_Lab.*']),
     install_requires=[
         'numpy',
@@ -28,7 +28,7 @@ setup(
     },
     author='Abdalla Mohammed',
     author_email='abdalla.mohammed.ox@gmail.com',
-    description='An intuitive, object-oriented and user-friendly Python implementation of a lumped conceptual HBV hydrological model for educational and research purposes.',
+    description='An agentic, object-oriented Python implementation of a lumped conceptual HBV hydrological model — with calibration, uncertainty analysis, and a built-in MCP server that lets AI agents drive the workflow.',
     long_description=long_description,
     long_description_content_type='text/markdown',  # Requires README.md in Markdown
     url='https://github.com/abdallaox/HBV_python_implementation',
@@ -41,5 +41,5 @@ setup(
         'Topic :: Scientific/Engineering :: Hydrology',
     ],
     python_requires='>=3.7',
-    keywords='hydrology HBV-model rainfall-runoff hydrological-modelling',
+    keywords='hydrology HBV-model rainfall-runoff hydrological-modelling MCP model-context-protocol agent agentic LLM',
 )

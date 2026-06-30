@@ -1,6 +1,6 @@
-# HBV_Lab
+# HBV_Lab — an agentic HBV hydrological model with an MCP server
 
-**An intuitive, object-oriented Python implementation of a lumped conceptual HBV rainfall–runoff model, with built-in calibration and uncertainty analysis.**
+**An intuitive, object-oriented Python implementation of a lumped conceptual HBV rainfall–runoff model — with built-in calibration and uncertainty analysis, and a Model Context Protocol (MCP) server that lets AI agents drive the whole workflow.**
 
 [![PyPI version](https://img.shields.io/pypi/v/HBV_Lab.svg)](https://pypi.org/project/HBV_Lab/)
 [![Python versions](https://img.shields.io/pypi/pyversions/HBV_Lab.svg)](https://pypi.org/project/HBV_Lab/)
@@ -18,6 +18,11 @@ full model is wrapped in a single `HBVModel` object that handles data loading, s
 calibration, uncertainty analysis, plotting, and persistence. It is well suited to research
 prototyping, method development, and hydrology education.
 
+**It is also agent-ready:** a built-in [MCP](https://modelcontextprotocol.io/) server exposes the
+model as tools, so an AI agent (Claude Code, Claude Desktop, or any MCP client) can build, calibrate,
+validate and run uncertainty analysis on HBV models through natural language — see
+[Use it as an MCP server](#use-it-as-an-mcp-server-for-ai-agents).
+
 > **Scope at a glance:** lumped (single-cell, spatially averaged) · conceptual · daily time step ·
 > requires precipitation, temperature and potential evapotranspiration as input · 14 calibratable
 > parameters. Please read [Scope, Assumptions & Limitations](#scope-assumptions--limitations) before
@@ -27,6 +32,8 @@ prototyping, method development, and hydrology education.
 
 ## Features
 
+- **Agent-ready MCP server** — drive the full *create → load → calibrate → validate → uncertainty*
+  workflow from an AI agent over stdio or HTTP, with live calibration progress and structured results.
 - **Complete HBV structure** — snow, soil, groundwater response (two reservoirs, three runoff
   components) and `MAXBAS` triangular routing.
 - **Object-oriented API** — one `HBVModel` object holds data, parameters, states and results.
@@ -155,6 +162,12 @@ Install once:
 ```bash
 pip install "HBV_Lab[mcp]"
 ```
+
+> **Upgrading:** stop/close the MCP client (and any running `hbv-mcp` process) **before**
+> upgrading — a running server holds `hbv-mcp.exe` open on Windows, so an in-place
+> `pip install -U` can fail with a file-lock error. After upgrading, **fully restart the
+> client** (or remove and re-add the server) so it re-discovers the tool list; clients fetch
+> tools only once per connection, so upgrading mid-session leaves them showing the old tools.
 
 #### Option A — local (stdio)
 

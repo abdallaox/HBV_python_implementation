@@ -372,10 +372,12 @@ async def calibrate(
     elif "iteration" in message.lower() or "maxiter" in message.lower():
         status = "hit_iteration_budget"
         guidance = (
-            "Hit the iteration budget; still improving - call calibrate again to "
-            "continue (it resumes from the current parameters)."
+            "Used the full iteration budget and the objective is still improving - "
+            "call calibrate again to continue (it resumes from the current parameters)."
             if still_improving
-            else "Hit the iteration budget but the objective has plateaued; likely converged."
+            else "Used the full iteration budget and the objective has plateaued "
+            "(improvement < 1e-3 over recent iterations); further iterations are "
+            "unlikely to help much. Stop here, or widen ranges if parameters are at_bound."
         )
     else:
         status, guidance = "failed", f"Optimizer stopped without converging: {message}"
