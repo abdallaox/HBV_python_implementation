@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name='HBV_Lab',
-    version='1.4.1',
+    version='1.4.2',
     packages=find_packages(include=['HBV_Lab', 'HBV_Lab.*']),
     install_requires=[
         'numpy',

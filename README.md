@@ -243,9 +243,16 @@ inspect the improving metric, and decide whether to keep going, widen ranges (vi
 model), `load_data` the validation window on the clone, and `run_model` — the calibrated parameters
 carry over with no manual transfer. `compare_models` tabulates calibration vs. validation metrics.
 
+**Transparent data loading.** `load_data` reports `pet_handling` (e.g.
+`expanded_from_12_monthly_means` when PET is supplied as 12 monthly means — the HBV-light convention —
+and auto-expanded to daily) and a per-column `data_quality` summary (valid/missing counts, min/max), so
+an agent can sanity-check the forcing without opening the file.
+
 **Richer uncertainty.** `evaluate_uncertainty` returns the 95% prediction-band **coverage** (fraction
-of observations inside the band), **mean band width**, and per-parameter **posterior ranges**, not
-just the best/current objective.
+of observations inside the band), **mean band width**, and per-parameter posterior **quantiles**
+(p5/p25/p50/p75/p95). Pass `output_file` to write the full **per-timestep prediction band**
+(Date, Observed, Calibrated, BestRun, Q5, Q95) to CSV, ready to plot. (Sampling is uniform over the
+parameter ranges — parameter, not predictive, uncertainty.)
 
 ## Inputs & outputs
 

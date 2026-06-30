@@ -140,6 +140,12 @@ def load_data(
     optional but required for calibration, uncertainty analysis and performance
     metrics. Dates use ``date_format`` (e.g. '%Y%m%d' for 19810101). ``warmup_end`` /
     ``start_date`` / ``end_date`` are optional date filters (same format).
+
+    Potential ET may be given as a full daily series OR as exactly 12 values (monthly
+    means, the HBV-light convention) — in the latter case it is **expanded to a daily
+    series automatically**. The return reports ``pet_handling`` so you know which path
+    was taken, plus a ``data_quality`` summary (valid/missing counts and min/max per
+    column) so you don't have to open the file to sanity-check the inputs.
     """
     import pandas as pd
 
@@ -150,6 +156,9 @@ def load_data(
         df = pd.read_excel(file_path)
     else:
         df = pd.read_csv(file_path)
+
+    # PET in the raw file: 12 non-NaN values => monthly means (will be expanded daily)
+    raw_pet_valid = int(df[pet_column].notna().sum()) if pet_column in df.columns else 0
 
     model.load_data(
         data=df,
@@ -163,6 +172,36 @@ def load_data(
         start_date=(start_date or None),
         end_date=(end_date or None),
     )
+
+    # Per-column data-quality summary over the loaded (filtered) window
+    data_quality = {}
+    col_map = {
+        "precipitation": precip_column,
+        "temperature": temp_column,
+        "potential_et": pet_column,
+        "observed_discharge": (obs_q_column or None),
+    }
+    for label, col in col_map.items():
+        if col and col in model.data.columns:
+            s = model.data[col]
+            has = bool(s.notna().any())
+            data_quality[label] = {
+                "valid": int(s.notna().sum()),
+                "missing": int(s.isna().sum()),
+                "pct_missing": round(float(s.isna().mean() * 100), 1),
+                "min": round(float(s.min()), 3) if has else None,
+                "max": round(float(s.max()), 3) if has else None,
+            }
+
+    # How PET was interpreted
+    pet_in_data = pet_column in model.data.columns
+    if raw_pet_valid == 12:
+        pet_handling = "expanded_from_12_monthly_means"
+    elif pet_in_data and bool(model.data[pet_column].notna().all()):
+        pet_handling = "daily_series"
+    else:
+        pet_handling = "sparse_or_missing"
+
     return {
         "model_id": model_id,
         "n_timesteps": int(len(model.data)),
@@ -170,6 +209,8 @@ def load_data(
         "end_date": str(model.end_date),
         "time_step": model.time_step,
         "has_observed_discharge": bool(obs_q_column),
+        "pet_handling": pet_handling,
+        "data_quality": data_quality,
     }
 
 
@@ -418,15 +459,23 @@ def evaluate_uncertainty(
     objective: str = "NSE",
     save_best: int = 10,
     seed: int = 42,
+    output_file: str = "",
 ) -> dict:
     """Monte-Carlo uncertainty analysis (requires obs data loaded).
 
-    Samples the parameter ranges ``n_runs`` times and keeps the ``save_best`` runs.
-    Returns the best vs. current performance; full prediction intervals stay in the
-    model and can be persisted with save_results.
+    Samples the parameter ranges ``n_runs`` times and keeps the ``save_best`` runs, then
+    forms a 95% prediction band from them. Returns diagnostics: the 95% band
+    ``coverage`` (fraction of observations inside the band), ``mean_band_width``, and the
+    per-parameter posterior **quantiles** (p5/p25/p50/p75/p95) across the best sets.
+
+    If ``output_file`` is given, the full **per-timestep prediction band** is written to
+    that CSV (Date, Observed, Calibrated, BestRun, Q5, Q95) — this is the band itself,
+    ready to plot. Sampling is uniform over the parameter ranges (this is parameter, not
+    predictive, uncertainty).
     """
     model = _get(model_id)
     import numpy as np
+    import pandas as pd
 
     out = model.evaluate_uncertainty(
         n_runs=n_runs,
@@ -450,16 +499,35 @@ def evaluate_uncertainty(
     else:
         coverage_95 = mean_band_width = None
 
-    # Per-parameter posterior ranges across the best parameter sets
+    # Per-parameter posterior quantiles across the best parameter sets
     posterior: dict = {}
     for s in out["best_parameter_sets"]:
         for params in s["parameters"].values():
             for name, info in params.items():
-                posterior.setdefault(name, []).append(info["default"])
-    posterior_ranges = {
-        name: {"min": round(float(min(v)), 4), "max": round(float(max(v)), 4)}
+                posterior.setdefault(name, []).append(float(info["default"]))
+    parameter_posteriors = {
+        name: {f"p{p}": round(float(np.percentile(v, p)), 4) for p in (5, 25, 50, 75, 95)}
         for name, v in posterior.items()
     }
+
+    # Optionally write the per-timestep prediction band to CSV
+    band_file = None
+    if output_file:
+        band = pd.DataFrame()
+        if "dates" in df.columns:
+            band["Date"] = df["dates"].values
+        band["Observed"] = df["observed"].values
+        if "original" in df.columns:
+            band["Calibrated"] = df["original"].values
+        if "best_1" in df.columns:
+            band["BestRun"] = df["best_1"].values
+        band["Q5"] = df["q5"].values
+        band["Q95"] = df["q95"].values
+        out_dir = os.path.dirname(output_file)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        band.to_csv(output_file, index=False)
+        band_file = os.path.abspath(output_file)
 
     return {
         "model_id": model_id,
@@ -470,7 +538,9 @@ def evaluate_uncertainty(
         "current_performance": round(float(out["original_performance"]), 4),
         "coverage_95": coverage_95,          # fraction of observations inside the 95% band
         "mean_band_width": mean_band_width,  # mean (q95 - q5), mm/day
-        "parameter_posterior_ranges": posterior_ranges,
+        "parameter_posteriors": parameter_posteriors,  # p5/p25/p50/p75/p95 per parameter
+        "band_file": band_file,              # per-timestep band CSV, if output_file given
+        "uncertainty_type": "parameter",     # uniform parameter sampling (not predictive)
     }
 
 
