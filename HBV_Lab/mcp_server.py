@@ -82,6 +82,26 @@ def _downsample(seq, n: int = 20) -> list:
     return [seq[i] for i in idx]
 
 
+def _at_bound(model: HBVModel, rel_tol: float = 0.005) -> list:
+    """List parameters whose value sits within ``rel_tol`` of their min or max bound.
+
+    A parameter pinned to a bound usually means the search range is clipping the true
+    optimum — surfacing it lets the agent widen the range with set_parameter_ranges.
+    """
+    flags = []
+    for group, params in model.params.items():
+        for name, info in params.items():
+            lo, hi, val = info.get("min"), info.get("max"), info.get("default")
+            if lo is None or hi is None or hi <= lo:
+                continue
+            margin = rel_tol * (hi - lo)
+            if val <= lo + margin:
+                flags.append({"parameter": name, "bound": "lower", "value": round(float(val), 4), "limit": float(lo)})
+            elif val >= hi - margin:
+                flags.append({"parameter": name, "bound": "upper", "value": round(float(val), 4), "limit": float(hi)})
+    return flags
+
+
 # --- tools --------------------------------------------------------------------
 @mcp.tool()
 def create_model(name: str = "") -> dict:
@@ -155,12 +175,59 @@ def load_data(
 
 @mcp.tool()
 def get_parameters(model_id: str) -> dict:
-    """Return the model's current parameter values (the 'default' of each), grouped."""
+    """Return the model's current parameter values (the 'default' of each), grouped,
+    plus an ``at_bound`` list flagging any parameter pinned to its min/max range."""
     model = _get(model_id)
     return {
-        group: {name: info["default"] for name, info in params.items()}
+        "parameters": {
+            group: {name: float(info["default"]) for name, info in params.items()}
+            for group, params in model.params.items()
+        },
+        "at_bound": _at_bound(model),
+    }
+
+
+@mcp.tool()
+def get_parameter_ranges(model_id: str) -> dict:
+    """Return the min / max / default of every parameter (the ranges the optimizer and
+    Monte-Carlo uncertainty sampling use), grouped."""
+    model = _get(model_id)
+    return {
+        group: {
+            name: {
+                "min": float(info["min"]),
+                "max": float(info["max"]),
+                "default": float(info["default"]),
+            }
+            for name, info in params.items()
+        }
         for group, params in model.params.items()
     }
+
+
+@mcp.tool()
+def set_parameter_ranges(model_id: str, ranges: dict) -> dict:
+    """Widen or narrow parameter search ranges from a flat mapping, e.g.
+    {"FC": {"min": 50, "max": 500}, "CFMAX": {"max": 10}}.
+
+    Each entry may set any of "min" / "max" / "default"; the group is resolved
+    automatically. Use this when calibrate reports a parameter ``at_bound`` — widen its
+    range, then calibrate again. Unknown names are reported and ignored.
+    """
+    model = _get(model_id)
+    update: dict = {}
+    unknown: list[str] = []
+    for name, spec in ranges.items():
+        group = _find_group(model, name)
+        if group is None:
+            unknown.append(name)
+            continue
+        allowed = {k: spec[k] for k in ("min", "max", "default") if k in spec}
+        if allowed:
+            update.setdefault(group, {})[name] = allowed
+    if update:
+        model.set_parameters(update)
+    return {"updated": update, "unknown_parameters": unknown}
 
 
 @mcp.tool()
@@ -292,18 +359,52 @@ async def calibrate(
 
     result = out["optimization_result"]
     traj = out.get("trajectory", [])
+    success = bool(getattr(result, "success", True))
+    message = str(getattr(result, "message", ""))
+
+    # Honest convergence reporting: a maxiter-capped run isn't a "failure" — it just
+    # ran out of budget and (usually) is still improving. Distinguish the cases.
+    still_improving = bool(
+        len(traj) >= 2 and abs(float(traj[-1]) - float(traj[-min(6, len(traj))])) > 1e-3
+    )
+    if success:
+        status, guidance = "converged", "Optimizer converged. No further iterations needed."
+    elif "iteration" in message.lower() or "maxiter" in message.lower():
+        status = "hit_iteration_budget"
+        guidance = (
+            "Hit the iteration budget; still improving - call calibrate again to "
+            "continue (it resumes from the current parameters)."
+            if still_improving
+            else "Hit the iteration budget but the objective has plateaued; likely converged."
+        )
+    else:
+        status, guidance = "failed", f"Optimizer stopped without converging: {message}"
+
+    at_bound = _at_bound(model)
+    if at_bound:
+        guidance += (
+            " Some parameters are at their range limits "
+            f"({', '.join(b['parameter'] for b in at_bound)}); consider widening them "
+            "with set_parameter_ranges before re-calibrating."
+        )
+
     return {
         "model_id": model_id,
         "objective": objective,
         "method": method,
         "n_iterations": int(getattr(result, "nit", len(traj))),
-        "success": bool(getattr(result, "success", True)),
-        "message": str(getattr(result, "message", "")),
+        "converged": success,
+        "status": status,
+        "still_improving": still_improving,
+        "guidance": guidance,
+        "success": success,  # kept for backward compatibility
+        "message": message,
         "optimized_parameters": {
-            group: {name: round(info["default"], 6) for name, info in params.items()}
+            group: {name: round(float(info["default"]), 6) for name, info in params.items()}
             for group, params in model.params.items()
         },
         "performance_metrics": _metrics(model),
+        "at_bound": at_bound,
         "objective_trajectory": _downsample(traj, 20),
     }
 
@@ -323,6 +424,8 @@ def evaluate_uncertainty(
     model and can be persisted with save_results.
     """
     model = _get(model_id)
+    import numpy as np
+
     out = model.evaluate_uncertainty(
         n_runs=n_runs,
         objective=objective,
@@ -331,12 +434,41 @@ def evaluate_uncertainty(
         plot_results=False,
         verbose=False,
     )
+
+    # 95% prediction-interval diagnostics from the best runs
+    df = out["best_runs"]
+    obs = np.asarray(df["observed"].values, dtype=float)
+    lo = np.asarray(df["q5"].values, dtype=float)
+    hi = np.asarray(df["q95"].values, dtype=float)
+    valid = ~np.isnan(obs)
+    if valid.any():
+        inside = (obs[valid] >= lo[valid]) & (obs[valid] <= hi[valid])
+        coverage_95 = round(float(inside.mean()), 3)
+        mean_band_width = round(float(np.nanmean(hi[valid] - lo[valid])), 4)
+    else:
+        coverage_95 = mean_band_width = None
+
+    # Per-parameter posterior ranges across the best parameter sets
+    posterior: dict = {}
+    for s in out["best_parameter_sets"]:
+        for params in s["parameters"].values():
+            for name, info in params.items():
+                posterior.setdefault(name, []).append(info["default"])
+    posterior_ranges = {
+        name: {"min": round(float(min(v)), 4), "max": round(float(max(v)), 4)}
+        for name, v in posterior.items()
+    }
+
     return {
         "model_id": model_id,
         "objective": objective,
         "n_runs": n_runs,
+        "save_best": save_best,
         "best_performance": round(float(out["best_performance"]), 4),
         "current_performance": round(float(out["original_performance"]), 4),
+        "coverage_95": coverage_95,          # fraction of observations inside the 95% band
+        "mean_band_width": mean_band_width,  # mean (q95 - q5), mm/day
+        "parameter_posterior_ranges": posterior_ranges,
     }
 
 
@@ -373,6 +505,69 @@ def load_model(model_path: str) -> dict:
     model_id = _new_id()
     _MODELS[model_id] = model
     return {"model_id": model_id, "performance_metrics": _metrics(model)}
+
+
+@mcp.tool()
+def clone_model(model_id: str, name: str = "") -> dict:
+    """Deep-copy a model (parameters, data, states, results) into a new model_id.
+
+    The canonical split-sample pattern: calibrate ``model-A``, ``clone_model`` it, then
+    ``load_data`` the validation window on the clone and ``run_model`` — the calibrated
+    parameters carry over, no manual parameter transfer needed.
+    """
+    import copy
+
+    src = _get(model_id)
+    new_id = _new_id()
+    _MODELS[new_id] = copy.deepcopy(src)
+    return {"model_id": new_id, "cloned_from": model_id, "name": name}
+
+
+@mcp.tool()
+def copy_parameters(from_model_id: str, to_model_id: str) -> dict:
+    """Copy the calibrated parameters (and ranges) from one model to another.
+
+    Use this to transfer a calibration to a validation model without copying its data.
+    """
+    import copy
+
+    src = _get(from_model_id)
+    dst = _get(to_model_id)
+    dst.params = copy.deepcopy(src.params)
+    return {
+        "from_model_id": from_model_id,
+        "to_model_id": to_model_id,
+        "parameters": {
+            group: {name: float(info["default"]) for name, info in params.items()}
+            for group, params in dst.params.items()
+        },
+    }
+
+
+@mcp.tool()
+def get_metrics(model_id: str) -> dict:
+    """Return the model's current performance metrics without re-running it.
+
+    Empty if the model hasn't been run with observed discharge yet.
+    """
+    model = _get(model_id)
+    return {"model_id": model_id, "performance_metrics": _metrics(model)}
+
+
+@mcp.tool()
+def compare_models(model_ids: list) -> dict:
+    """Tabulate performance metrics across several models side by side.
+
+    Handy for comparing calibration vs validation, or several calibration variants.
+    """
+    rows = []
+    for mid in model_ids:
+        try:
+            model = _get(mid)
+            rows.append({"model_id": mid, "metrics": _metrics(model)})
+        except ValueError as e:
+            rows.append({"model_id": mid, "error": str(e)})
+    return {"comparison": rows}
 
 
 def main() -> None:

@@ -24,7 +24,7 @@ from .soil import soil_routine
 from .response import response_routine_two_tanks
 from .routing import route_with_maxbas
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 __all__ = [
     "HBVModel",

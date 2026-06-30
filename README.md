@@ -209,19 +209,30 @@ mode deploys cleanly to platforms like Railway, Render or Fly.
 
 #### What the agent can do
 
-Tools: `create_model`, `load_data` (from a CSV/Excel file path), `get_parameters`, `set_parameters`,
-`set_initial_conditions`, `run_model`, `calibrate`, `evaluate_uncertainty`, `plot_results`,
-`save_results`, `save_model`, `load_model`, `list_models`. A typical agent flow is *create → load →
-run → calibrate → plot*. Model state is kept server-side (each tool takes a `model_id`) and large time
-series are passed by **file path**, not through the agent's context — tools return compact metrics and
-output-file paths.
+Tools: `create_model`, `clone_model`, `copy_parameters`, `load_data` (from a CSV/Excel file path),
+`get_parameters`, `set_parameters`, `get_parameter_ranges`, `set_parameter_ranges`,
+`set_initial_conditions`, `run_model`, `calibrate`, `evaluate_uncertainty`, `get_metrics`,
+`compare_models`, `plot_results`, `save_results`, `save_model`, `load_model`, `list_models`. A typical
+agent flow is *create → load → run → calibrate → plot*. Model state is kept server-side (each tool
+takes a `model_id`) and large time series are passed by **file path**, not through the agent's
+context — tools return compact metrics and output-file paths.
 
 **Calibration progress & agent steering.** `calibrate` emits MCP progress notifications every
 optimizer iteration (clients that surface them show a live progress/log view), and its result
-includes the optimizer status and the best-objective-per-iteration `objective_trajectory`. Because
-each call continues from the model's *current* parameters, an agent can also calibrate incrementally
-— call `calibrate` with a small `iterations` budget, inspect the improving metric, and decide whether
-to keep going, widen ranges, or switch objective between rounds.
+reports an honest convergence `status` (`converged` / `hit_iteration_budget` / `failed`),
+`still_improving`, the best-objective-per-iteration `objective_trajectory`, and an `at_bound` list of
+parameters pinned to their range limits. Because each call continues from the model's *current*
+parameters, an agent can calibrate incrementally — call `calibrate` with a small `iterations` budget,
+inspect the improving metric, and decide whether to keep going, widen ranges (via
+`set_parameter_ranges`), or switch objective between rounds.
+
+**Split-sample made easy.** Calibrate one model, `clone_model` it (or `copy_parameters` to a second
+model), `load_data` the validation window on the clone, and `run_model` — the calibrated parameters
+carry over with no manual transfer. `compare_models` tabulates calibration vs. validation metrics.
+
+**Richer uncertainty.** `evaluate_uncertainty` returns the 95% prediction-band **coverage** (fraction
+of observations inside the band), **mean band width**, and per-parameter **posterior ranges**, not
+just the best/current objective.
 
 ## Inputs & outputs
 
