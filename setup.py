@@ -19,7 +19,8 @@ setup(
         # Optional dependencies for the interactive Bokeh playground
         'playground': ['bokeh>=2.4.0'],
         # Optional dependencies for the MCP server (expose the model to agents)
-        'mcp': ['mcp>=1.0.0'],
+        # mcp 2.x renamed FastMCP to MCPServer and changed other APIs: the server needs 1.x
+        'mcp': ['mcp>=1.0.0,<2'],
     },
     entry_points={
         'console_scripts': [
