@@ -63,11 +63,34 @@ parameters = {
 
 In the model object the parameters are stored in **three** groups — `snow`, `soil` and `response` —
 with the routing parameter `MAXBAS` held inside the `response` group. Each parameter is a dictionary
-with `min` / `max` / `default` values (the ranges are used by calibration and uncertainty analysis):
+with `min` / `max` / `default` values (the ranges are used by calibration and uncertainty analysis).
+
+Default ranges and starting values:
+
+| Routine | Parameter | Unit | Min | Max | Default |
+|---|---|---|---|---|---|
+| Snow | TT | °C | -2 | 2 | 0 |
+| | CFMAX | mm °C⁻¹ d⁻¹ | 1 | 6 | 3.5 |
+| | SFCF | - | 0.5 | 1.5 | 1 |
+| | CFR | - | 0 | 0.2 | 0.05 |
+| | CWH | - | 0 | 0.2 | 0.1 |
+| Soil | FC | mm | 50 | 500 | 150 |
+| | LP | - | 0.3 | 1 | 0.7 |
+| | BETA | - | 1 | 5 | 2 |
+| Response | K0 | d⁻¹ | 0.1 | 0.9 | 0.5 |
+| | K1 | d⁻¹ | 0.05 | 0.5 | 0.2 |
+| | K2 | d⁻¹ | 0.0005 | 0.1 | 0.05 |
+| | UZL | mm | 5 | 50 | 20 |
+| | PERC | mm d⁻¹ | 0.5 | 10 | 1.5 |
+| Routing | MAXBAS | d | 1 | 10 | 3 |
+
+Since v1.5.0, FC, PERC and K2 use the wider ranges of Seibert (1997). The earlier ranges (FC up to
+300 mm, PERC up to 3 mm d⁻¹, K2 from 0.01 d⁻¹) held calibrations of dry and chalk catchments at
+their limits. Any range can be changed per model:
 
 ```python
 model.set_parameters({
-    'soil':     {'FC': {'min': 50, 'max': 500, 'default': 250}},
+    'soil':     {'FC': {'min': 50, 'max': 700, 'default': 250}},
     'response': {'MAXBAS': {'default': 4}},
 })
 ```

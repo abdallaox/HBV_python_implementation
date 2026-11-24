@@ -46,16 +46,18 @@ class HBVModel(uncertainty, calibration):
                 'CWH': {'min': 0.0, 'max': 0.2, 'default': 0.1}
             },
             'soil': {
-                'FC': {'min': 50.0, 'max': 300.0, 'default': 150.0},
+                # FC, PERC and K2 ranges follow Seibert (1997) since v1.5.0. The earlier, narrower
+                # ranges (FC <= 300, PERC <= 3, K2 >= 0.01) pinned dry and chalk catchments at the bounds.
+                'FC': {'min': 50.0, 'max': 500.0, 'default': 150.0},
                 'LP': {'min': 0.3, 'max': 1.0, 'default': 0.7},
                 'BETA': {'min': 1.0, 'max': 5.0, 'default': 2.0}
             },
             'response': {
                 'K0': {'min': 0.1, 'max': 0.9, 'default': 0.5},
                 'K1': {'min': 0.05, 'max': 0.5, 'default': 0.2},
-                'K2': {'min': 0.01, 'max': 0.1, 'default': 0.05},
+                'K2': {'min': 0.0005, 'max': 0.1, 'default': 0.05},
                 'UZL': {'min': 5.0, 'max': 50.0, 'default': 20.0},
-                'PERC': {'min': 0.5, 'max': 3.0, 'default': 1.5},
+                'PERC': {'min': 0.5, 'max': 10.0, 'default': 1.5},
                 'MAXBAS' :{'min': 1, 'max': 10, 'default': 3}  
             }
         }
