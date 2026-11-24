@@ -272,9 +272,16 @@ RMSE, MAE, correlation) are computed over the post-warm-up period.
 Because the model contains many threshold operations, its objective surface is piecewise-constant.
 Gradient-based optimisers (e.g. `SLSQP`, `L-BFGS-B`) see near-zero numerical gradients and tend to
 stop at the starting point without improving the fit, so calibration uses a **gradient-free**
-method (`Nelder-Mead`) **by default**. The optimiser performs a single-objective, local search; for
-a more thorough exploration of the parameter space, run `evaluate_uncertainty()` (Monte-Carlo) or
-calibrate from several starting points.
+method (`Nelder-Mead`) **by default**. Nelder-Mead is a single-objective, local search. For a global
+search, use **Dynamically Dimensioned Search** (Tolson and Shoemaker, 2007), which was designed for
+hydrological model calibration. With DDS, `iterations` is the number of model runs, and `seed` makes
+the run repeatable:
+
+```python
+model.calibrate(method='DDS', objective='NSE', iterations=2000, seed=0)
+```
+
+For a broader picture of the parameter space, run `evaluate_uncertainty()` (Monte-Carlo).
 
 ## Scope, Assumptions & Limitations
 

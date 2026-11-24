@@ -337,12 +337,16 @@ async def calibrate(
     objective: str = "NSE",
     method: str = "Nelder-Mead",
     iterations: int = 1000,
+    seed: int | None = None,
     ctx: Context = None,
 ) -> dict:
     """Calibrate the model to observed discharge (requires obs data loaded).
 
-    ``objective`` is one of NSE / KGE / RMSE / MAE. ``method`` defaults to the
-    gradient-free 'Nelder-Mead' (recommended for HBV's piecewise objective).
+    ``objective`` is one of NSE / KGE / RMSE / MAE. ``method`` is a gradient-free
+    optimiser: 'Nelder-Mead' (default, local), 'Powell' (local) or 'DDS'
+    (Dynamically Dimensioned Search, global, designed for hydrological model
+    calibration). For 'DDS', ``iterations`` is the number of model runs
+    (about 1000 to 5000 is typical) and ``seed`` makes the run repeatable.
 
     Progress: while running, the server emits MCP progress notifications each
     optimizer iteration (visible in clients that surface them).
@@ -361,9 +365,12 @@ async def calibrate(
     loop = asyncio.get_running_loop()
     updates: asyncio.Queue = asyncio.Queue()
 
+    step = max(1, iterations // 50)  # at most about 50 progress messages per call
+
     def progress_cb(i, total, current, best):
         # Runs in the worker thread — hand the update back to the event loop safely.
-        loop.call_soon_threadsafe(updates.put_nowait, (i, total, current, best))
+        if i % step == 0 or i >= total:
+            loop.call_soon_threadsafe(updates.put_nowait, (i, total, current, best))
 
     async def report(i, total, current, best):
         if ctx is None:
@@ -386,6 +393,7 @@ async def calibrate(
             verbose=False,
             plot_results=False,
             progress_callback=progress_cb,
+            seed=seed,
         )
     )
     while not task.done():

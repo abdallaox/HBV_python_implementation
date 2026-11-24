@@ -1,7 +1,8 @@
 class calibration:
 
     def calibrate(self, method='Nelder-Mead', objective='NSE', iterations=100,
-                            verbose=True, plot_results=True, progress_callback=None):
+                            verbose=True, plot_results=True, progress_callback=None,
+                            seed=None, dds_r=0.2):
         """
         Calibrate an HBV model's parameters to optimize the objective function.
 
@@ -17,6 +18,11 @@ class calibration:
             as 'SLSQP' or 'L-BFGS-B' to terminate immediately without improving
             on the starting values. Gradient-free options that respect the
             parameter bounds include 'Nelder-Mead' and 'Powell'.
+            'DDS' selects Dynamically Dimensioned Search (Tolson and Shoemaker,
+            2007, Water Resources Research 43, W01413), a global single-solution
+            search designed for watershed model calibration. With 'DDS',
+            ``iterations`` is the number of model evaluations, and the search
+            starts from the current parameter values.
         objective : str, default 'NSE'
             Objective function to maximize. Options are:
             - 'NSE': Nash-Sutcliffe Efficiency (higher is better)
@@ -35,6 +41,11 @@ class calibration:
             where the values are in human-facing objective terms (e.g. NSE). Useful for
             driving an external progress UI (e.g. the MCP server). Exceptions raised by
             the callback are swallowed so they cannot interrupt calibration.
+        seed : int, optional
+            Random seed for 'DDS', for reproducible runs. Ignored by other methods.
+        dds_r : float, default 0.2
+            DDS neighbourhood perturbation size, as a fraction of each parameter
+            range (0.2 is the value recommended by Tolson and Shoemaker).
 
         Returns:
         --------
@@ -173,9 +184,11 @@ class calibration:
         # (e.g. NSE/KGE as-is, RMSE/MAE as-is). Returned to the caller.
         trajectory = []
 
-        def callback(params):
+        def callback(params, current_value=None):
+            # DDS passes the value it has already computed, which saves a model run
             num_iter[0] += 1
-            current_value = objective_function(params)
+            if current_value is None:
+                current_value = objective_function(params)
 
             # For NSE and KGE, we're minimizing the negative value
             if objective in ['NSE', 'KGE']:
@@ -215,14 +228,18 @@ class calibration:
         
         try:
             # Run optimization
-            result = opt.minimize(
-                objective_function,
-                initial_params,
-                method=method,
-                bounds=param_bounds,
-                callback=callback,
-                options={'maxiter': iterations}
-            )
+            if str(method).upper() == 'DDS':
+                result = _dds(objective_function, initial_params, param_bounds, iterations,
+                              r=dds_r, seed=seed, callback=callback)
+            else:
+                result = opt.minimize(
+                    objective_function,
+                    initial_params,
+                    method=method,
+                    bounds=param_bounds,
+                    callback=callback,
+                    options={'maxiter': iterations}
+                )
             
             # Get optimized parameters
             opt_params = result.x
@@ -273,3 +290,68 @@ class calibration:
             self.params = original_params
             print(f"Calibration failed with error: {str(e)}")
             raise
+
+
+def _dds(fun, x0, bounds, max_evals, r=0.2, seed=None, callback=None):
+    """Dynamically Dimensioned Search (Tolson and Shoemaker, 2007) for minimisation.
+
+    Starts from ``x0`` and spends ``max_evals`` evaluations of ``fun`` in total
+    (the first one on ``x0``). At evaluation i, each parameter is perturbed with
+    probability 1 - ln(i)/ln(max_evals), so the search moves from global to
+    local as the budget is used up. Perturbations are Gaussian with standard
+    deviation ``r`` times the parameter range and are reflected at the bounds.
+    ``callback(x_best, f_best)`` is called after every evaluation.
+
+    Returns a ``scipy.optimize.OptimizeResult`` (fields x, fun, nit, nfev,
+    success, message, history), so callers can treat it like ``minimize``.
+    """
+    import numpy as np
+    from scipy.optimize import OptimizeResult
+
+    rng = np.random.default_rng(seed)
+    lb = np.array([b[0] for b in bounds], dtype=float)
+    ub = np.array([b[1] for b in bounds], dtype=float)
+    span = ub - lb
+    free = np.flatnonzero(span > 0)  # parameters with a fixed value are never perturbed
+    max_evals = max(1, int(max_evals))
+
+    def f(x):
+        v = float(fun(x))
+        return v if np.isfinite(v) else np.inf
+
+    x_best = np.clip(np.asarray(x0, dtype=float), lb, ub)
+    f_best = f(x_best)
+    history = [f_best]
+    if callback is not None:
+        callback(x_best.copy(), f_best)
+
+    for i in range(1, max_evals):
+        x_new = x_best.copy()
+        if free.size:
+            p = 1.0 - np.log(i) / np.log(max_evals)
+            pick = free[rng.random(free.size) < p]
+            if pick.size == 0:
+                pick = np.array([rng.choice(free)])
+            for j in pick:
+                v = x_best[j] + r * span[j] * rng.standard_normal()
+                if v < lb[j]:
+                    v = lb[j] + (lb[j] - v)
+                    if v > ub[j]:
+                        v = lb[j]
+                elif v > ub[j]:
+                    v = ub[j] - (v - ub[j])
+                    if v < lb[j]:
+                        v = ub[j]
+                x_new[j] = v
+        f_new = f(x_new)
+        if f_new <= f_best:
+            x_best, f_best = x_new, f_new
+        history.append(f_best)
+        if callback is not None:
+            callback(x_best.copy(), f_best)
+
+    return OptimizeResult(
+        x=x_best, fun=f_best, nit=max_evals, nfev=max_evals, success=False,
+        message=f"DDS used its full budget of {max_evals} evaluations "
+                f"(maximum number of iterations reached).",
+        history=history)
