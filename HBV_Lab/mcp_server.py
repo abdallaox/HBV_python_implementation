@@ -301,7 +301,20 @@ def set_initial_conditions(
     upper_storage: float | None = None,
     lower_storage: float | None = None,
 ) -> dict:
-    """Set initial state values (mm). Omitted states keep their current value."""
+    """Set the initial storage of each model store (mm) at the start of the loaded period.
+
+    Omitted states keep their current value. The defaults are snowpack 0, liquid_water 0,
+    soil_moisture 30, upper_storage 10 and lower_storage 20 mm. Every run, calibration and
+    uncertainty run starts from these values, and clone_model copies them (copy_parameters
+    does not).
+
+    When it matters: a store that starts far from its usual level drifts during the first
+    part of the run. A warm-up period hides a short drift, but slow stores (a large FC, or
+    a small K2 in groundwater-fed catchments) can take years to settle, longer than the
+    warm-up. run_model reports each store's level at the start, its mean and its level at
+    the end of the run (``stores``). If a store ends far from where it started, setting its
+    initial value near its mean or end level gives a run that starts close to equilibrium.
+    """
     model = _get(model_id)
     model.set_initial_conditions(
         snowpack=snowpack,
@@ -316,18 +329,29 @@ def set_initial_conditions(
 @mcp.tool()
 def run_model(model_id: str) -> dict:
     """Run the simulation over the loaded period. Returns a compact summary +
-    performance metrics (if observed discharge was provided)."""
+    performance metrics (if observed discharge was provided).
+
+    ``stores`` gives each store's level (mm) at the start, its mean over the run and its
+    level at the end. A large difference between start and end means the store had not
+    reached equilibrium at the start (see set_initial_conditions)."""
     import numpy as np
 
     model = _get(model_id)
     model.run(verbose=False)
     q = model.results["discharge"]
+    stores = {}
+    for name, start in model.states.items():
+        series = model.results.get(name)
+        if series is not None and len(series):
+            stores[name] = {"start": round(float(start), 2), "mean": round(float(np.mean(series)), 2),
+                            "end": round(float(series[-1]), 2)}
     return {
         "model_id": model_id,
         "n_timesteps": int(len(q)),
         "mean_discharge": round(float(np.mean(q)), 4),
         "max_discharge": round(float(np.max(q)), 4),
         "performance_metrics": _metrics(model),
+        "stores": stores,
     }
 
 
