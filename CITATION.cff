@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use HBV_Lab, please cite it using the metadata below."
+title: "HBV_Lab: an agentic HBV hydrological model with an MCP server"
+type: software
+authors:
+  - given-names: Abdalla
+    family-names: Mohammed
+version: 1.5.0
+date-released: 2026-11-24
+doi: 10.5281/zenodo.24514257
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.24514257
+    description: Concept DOI, resolves to the latest version
+  - type: doi
+    value: 10.5281/zenodo.24514258
+    description: Version 1.5.0
+repository-code: "https://github.com/abdallaox/HBV_python_implementation"
+url: "https://pypi.org/project/HBV-Lab/"
+license: MIT
+keywords:
+  - hydrology
+  - HBV
+  - rainfall-runoff model
+  - calibration
+  - Model Context Protocol
+  - AI agents
+abstract: >-
+  An object-oriented Python implementation of the lumped conceptual HBV rainfall-runoff model,
+  with calibration (Nelder-Mead or DDS), Monte Carlo uncertainty analysis, and a Model Context
+  Protocol (MCP) server that lets AI agents set up, calibrate and diagnose the model.

@@ -5,6 +5,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/HBV_Lab.svg)](https://pypi.org/project/HBV_Lab/)
 [![Python versions](https://img.shields.io/pypi/pyversions/HBV_Lab.svg)](https://pypi.org/project/HBV_Lab/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24514257.svg)](https://doi.org/10.5281/zenodo.24514257)
 
 HBV is a widely used conceptual hydrological model that simulates the main processes governing the
 transformation of precipitation into streamflow — snow accumulation and melt, soil moisture
@@ -357,8 +358,15 @@ appreciated.
 
 ## Citation
 
-If you use `HBV_Lab` in academic work, please cite this repository and the foundational HBV
-references below. A `CITATION` entry can be provided on request.
+If you use `HBV_Lab` in academic work, please cite the software archive on Zenodo and the
+foundational HBV references below:
+
+> Mohammed, A. (2026). *HBV_Lab: an agentic HBV hydrological model with an MCP server*. Zenodo.
+> [doi:10.5281/zenodo.24514257](https://doi.org/10.5281/zenodo.24514257)
+
+This DOI always resolves to the latest version. Each release also has its own DOI (v1.5.0:
+[10.5281/zenodo.24514258](https://doi.org/10.5281/zenodo.24514258)), listed on the Zenodo page.
+Citation metadata is in [`CITATION.cff`](CITATION.cff).
 
 ## License
 
