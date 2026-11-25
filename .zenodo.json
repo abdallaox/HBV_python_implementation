@@ -1,0 +1,10 @@
+{
+  "title": "HBV-Lab: an agentic HBV hydrological model with an MCP server",
+  "upload_type": "software",
+  "creators": [
+    {"name": "Mohammed, Abdalla", "affiliation": "University College London"}
+  ],
+  "description": "An object-oriented Python implementation of the lumped conceptual HBV rainfall-runoff model, with calibration (Nelder-Mead, Powell or DDS), Monte Carlo uncertainty analysis, and a Model Context Protocol (MCP) server that lets AI agents set up, calibrate and diagnose the model. Version 1.5.1 adds store levels to the run_model reply, documents initial conditions in the MCP tools, and pins mcp<2 for the MCP extra.",
+  "license": "MIT",
+  "keywords": ["hydrology", "HBV", "rainfall-runoff model", "calibration", "Model Context Protocol", "AI agents"]
+}

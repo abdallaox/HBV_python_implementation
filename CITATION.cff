@@ -1,12 +1,12 @@
 cff-version: 1.2.0
 message: "If you use HBV_Lab, please cite it using the metadata below."
-title: "HBV_Lab: an agentic HBV hydrological model with an MCP server"
+title: "HBV-Lab: an agentic HBV hydrological model with an MCP server"
 type: software
 authors:
   - given-names: Abdalla
     family-names: Mohammed
-version: 1.5.0
-date-released: 2026-11-24
+version: 1.5.1
+date-released: 2026-11-25
 doi: 10.5281/zenodo.24514257
 identifiers:
   - type: doi
